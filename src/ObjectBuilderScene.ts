@@ -3,7 +3,7 @@ import Phaser from 'phaser';
 interface Shape {
   id: string;
   name?: string; // 레이어 표시 이름 (선택적)
-  type: 'rect' | 'roundedRect' | 'circle' | 'triangle' | 'rightTriangle' | 'trapezoid' | 'pentagon' | 'hexagon';
+  type: 'rect' | 'roundedRect' | 'circle' | 'triangle' | 'rightTriangle' | 'mirroredRightTriangle' | 'trapezoid' | 'pentagon' | 'hexagon';
   x: number;
   y: number;
   width: number;
@@ -43,6 +43,11 @@ export default class ObjectBuilderScene extends Phaser.Scene {
   // (260405) 실행 취소(Undo) 레이어 상태 스택
   private undoStack: string[] = [];
   private readonly MAX_UNDO = 100;
+  
+  private isInitialized: boolean = false;
+  private projectName: string = "Untitled_Object";
+  private fileHandle: any = null;
+  private autoSaveTimer: any = null;
   
   constructor() {
     super('ObjectBuilderScene');
@@ -168,8 +173,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     // 독립 툴이므로 (0,0)을 월드 중심으로 사용
     this.previewContainer = this.add.container(0, 0);
     
-    // UI 생성 (DOM 오버레이)
-    this.createUI();
+    // 초기화 방식을 프로젝트 생성 모달로 변경
+    this.renderSplashModal();
     this.selectionGraphics = this.add.graphics().setDepth(1000);
     this.selectionBoxGraphics = this.add.graphics().setDepth(1001);
     
@@ -311,6 +316,79 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     }
   }
 
+  public async openJSON() {
+    // (260410) 작업 중인 내용이 있으면 저장 확인 (시작 화면이 아닐 때만)
+    if (this.isInitialized && this.shapes.length > 0) {
+      if (!confirm('현재 작업 중인 내용이 있습니다. 저장하지 않고 새로운 파일을 여시겠습니까?')) {
+        return;
+      }
+    }
+
+    try {
+      let content = "";
+      let fileName = "";
+      
+      if ('showOpenFilePicker' in window) {
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [{
+            description: 'JSON Files',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        this.fileHandle = handle;
+        const file = await handle.getFile();
+        content = await file.text();
+        fileName = handle.name;
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        const filePromise = new Promise<File | null>((resolve) => {
+          input.onchange = (e: any) => resolve(e.target.files[0]);
+        });
+        input.click();
+        const file = await filePromise;
+        if (!file) return;
+        content = await file.text();
+        fileName = file.name;
+      }
+
+      if (content) {
+        const loadedData = JSON.parse(content);
+        let loadedShapes: Shape[] = [];
+        let loadedProjectName = this.projectName;
+
+        if (Array.isArray(loadedData)) {
+          loadedShapes = loadedData;
+        } else if (loadedData && loadedData.shapes && Array.isArray(loadedData.shapes)) {
+          loadedShapes = loadedData.shapes;
+          loadedProjectName = loadedData.projectName || loadedProjectName;
+        }
+
+        if (loadedShapes.length > 0) {
+          this.saveHistory();
+          this.shapes = loadedShapes;
+          this.projectName = loadedProjectName;
+          this.selectedShapeIds.clear();
+          this.refreshShapeList();
+          this.renderPreview();
+          this.renderInspector();
+          
+          if (!this.isInitialized) {
+            this.completeInitialization();
+          } else {
+            this.updateUIHeader(); // 불러오기 후 헤더 갱신
+          }
+          alert(`Successfully loaded: ${fileName}`);
+        } else {
+          alert('No valid shapes found in this file.');
+        }
+      }
+    } catch (err) {
+      console.error('File open failed or cancelled:', err);
+    }
+  }
+
   public exportJSON() {
     const now = new Date();
     const dateStr = now.getFullYear() + 
@@ -322,7 +400,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     
     // (260405) 통합 JSON 포맷 구성
     const exportData = {
-        version: "1.5",
+        version: "1.0.0",
+        projectName: this.projectName,
         timestamp: now.toISOString(),
         shapes: this.shapes,
         code: this.getGeneratedCode()
@@ -435,27 +514,30 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       box-shadow: 10px 0 30px rgba(0,0,0,0.5);
     `;
 
-    const presetButtons = Object.keys(ObjectBuilderScene.PRESETS).map(name => 
-      `<button onclick="window.builder.loadPreset('${name}')" style="padding: 8px; background: #222; border: 1px solid #444; color: #aaa; cursor: pointer; text-align: left; font-size: 11px; transition: 0.2s;">${name}</button>`
-    ).join('');
-
     leftPanel.innerHTML = `
-      <div style="margin-bottom: 20px; border-bottom: 2px solid #ff3366; padding-bottom: 10px;">
+      <div style="margin-bottom: 15px; border-bottom: 2px solid #ff3366; padding-bottom: 10px;">
         <h2 style="margin: 0; color: #fff; font-size: 18px; letter-spacing: 1px;">OBJECT BUILDER</h2>
-        <span style="font-size: 10px; color: #ff3366;">v1.5 STABLE</span>
+        <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 5px;">
+          <span style="font-size: 10px; color: #ff3366;">v1.0.0 STABLE</span>
+          <span style="font-size: 9px; color: #666; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 100px;" id="ui-project-name">[ ${this.projectName} ]</span>
+        </div>
+      </div>
+      <div id="ui-file-info" style="margin-bottom: 20px; font-size: 11px; color: #888; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; background: rgba(255,255,255,0.05); padding: 5px 8px; border-radius: 4px;">
+        File: ${this.fileHandle ? this.fileHandle.name : 'No file linked'}
       </div>
       
       <div style="margin-bottom: 25px;">
         <h3 style="font-size: 11px; color: #666; margin-bottom: 10px; text-transform: uppercase;">Shapes</h3>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <button onclick="window.builder.addShape('rect')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Rect</button>
-          <button onclick="window.builder.addShape('roundedRect')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">RoundR</button>
-          <button onclick="window.builder.addShape('circle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Circle</button>
-          <button onclick="window.builder.addShape('triangle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Tri</button>
-          <button onclick="window.builder.addShape('trapezoid')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Trapez</button>
-          <button onclick="window.builder.addShape('pentagon')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Pentagon</button>
-          <button onclick="window.builder.addShape('hexagon')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">Hexagon</button>
-          <button onclick="window.builder.addShape('rightTriangle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">RightT</button>
+          <button onclick="window.builder.addShape('rect')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">■ Rect</button>
+          <button onclick="window.builder.addShape('roundedRect')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">▢ RoundR</button>
+          <button onclick="window.builder.addShape('circle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">● Circle</button>
+          <button onclick="window.builder.addShape('triangle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">▲ Tri (Iso)</button>
+          <button onclick="window.builder.addShape('rightTriangle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">◥ Right T</button>
+          <button onclick="window.builder.addShape('mirroredRightTriangle')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">◤ Mirrored T</button>
+          <button onclick="window.builder.addShape('trapezoid')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">⬔ Trapez</button>
+          <button onclick="window.builder.addShape('pentagon')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">⬠ Pent</button>
+          <button onclick="window.builder.addShape('hexagon')" style="padding: 8px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">⬢ Hex</button>
         </div>
       </div>
 
@@ -464,21 +546,14 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         <div id="shape-list-container" style="flex: 1; overflow-y: auto; display: flex; flex-direction: column; gap: 4px; padding-right: 5px;"></div>
       </div>
 
-      <div style="margin-bottom: 20px;">
-        <h3 style="font-size: 11px; color: #666; margin-bottom: 10px; text-transform: uppercase;">Presets</h3>
-        <div style="display: grid; grid-template-columns: 1fr; gap: 4px; max-height: 150px; overflow-y: auto; padding-right: 5px;">
-          ${presetButtons}
-        </div>
-      </div>
-
       <div style="border-top: 1px solid #333; padding-top: 15px; display: flex; flex-direction: column; gap: 8px;">
         <button onclick="window.builder.copyCode()" style="width: 100%; padding: 12px; background: #ff3366; color: white; border: none; border-radius: 4px; cursor: pointer; font-weight: bold;">COPY CODE / JSON</button>
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 8px;">
-          <button onclick="window.builder.exportJSON()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">DOWNLOAD JSON</button>
-          <button onclick="window.builder.importJSON()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">IMPORT JSON</button>
-          <button onclick="window.builder.undo()" style="grid-column: span 2; padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">UNDO (Ctrl+Z)</button>
+          <button onclick="window.builder.saveToFileWithNotice()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">SAVE JSON</button>
+          <button onclick="window.builder.openJSON()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">OPEN JSON</button>
+          <button onclick="window.builder.showProjectInfo()" style="padding: 10px; background: #222; border: 1px solid #444; color: #777; cursor: pointer; border-radius: 4px; font-size: 11px;">INFO</button>
+          <button onclick="window.builder.undo()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">UNDO (Ctrl+Z)</button>
         </div>
-        <button onclick="window.builder.exit()" style="width: 100%; padding: 8px; background: #222; border: 1px solid #444; color: #777; cursor: pointer; border-radius: 4px; font-size: 12px;">BACK TO PROJECT</button>
       </div>
     `;
 
@@ -486,7 +561,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     const rightPanel = document.createElement('div');
     rightPanel.id = 'inspector-panel';
     rightPanel.style.cssText = `
-      width: 300px; background: rgba(15, 15, 20, 0.95);
+      width: 250px; background: rgba(15, 15, 20, 0.95);
       border-left: 1px solid #333; padding: 25px;
       pointer-events: auto; display: none; height: 100vh; box-sizing: border-box;
       box-shadow: -10px 0 30px rgba(0,0,0,0.5);
@@ -514,13 +589,169 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     
     document.getElementById('game-container')?.appendChild(this.uiContainer);
 
-    document.getElementById('add-right-triangle')?.addEventListener('click', () => {
-      this.addShape('rightTriangle');
-    });
-
     // 전역 접근 허용
     (window as any).builder = this;
     this.refreshShapeList();
+  }
+
+  private renderSplashModal() {
+    const modal = document.createElement('div');
+    modal.id = 'splash-modal';
+    modal.style.cssText = `
+      position: absolute; top:0; left:0; width:100%; height:100%;
+      background: rgba(10, 10, 15, 0.2);
+      display: flex; align-items: center; justify-content: center;
+      z-index: 10000; pointer-events: auto;
+      font-family: 'Inter', sans-serif;
+    `;
+
+    modal.innerHTML = `
+      <div style="width: 450px; padding: 40px; background: #1a1a1f; border: 1px solid #333; border-radius: 12px; box-shadow: 0 20px 50px rgba(0,0,0,0.8); text-align: center;">
+        <div style="margin-bottom: 30px;">
+          <h1 style="margin: 0; color: #fff; font-size: 24px; letter-spacing: 2px;">OBJECT BUILDER</h1>
+          <div style="color: #ff3366; font-size: 11px; margin-top: 5px; font-weight: bold;">v1.0.0 STABLE</div>
+        </div>
+
+        <div style="margin-bottom: 30px; text-align: left;">
+          <label style="display: block; font-size: 11px; color: #666; margin-bottom: 8px; text-transform: uppercase;">New Project Name</label>
+          <input type="text" id="new-project-name" placeholder="Input Object Name Here" style="width: 100%; background: #000; border: 1px solid #444; color: #fff; padding: 15px; border-radius: 6px; font-size: 16px; box-sizing: border-box; outline: none; border-color: #ff3366;">
+        </div>
+
+        <div style="display: flex; flex-direction: column; gap: 12px;">
+          <button onclick="window.builder.initNewProject()" style="width: 100%; padding: 15px; background: #ff3366; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">CREATE NEW OBJECT</button>
+          <button onclick="window.builder.startDirectly()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #ff3366; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">JUST START (NO FILE)</button>
+          <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
+            <div style="flex: 1; height: 1px; background: #333;"></div>
+            <span style="font-size: 11px; color: #444;">OR</span>
+            <div style="flex: 1; height: 1px; background: #333;"></div>
+          </div>
+          <button onclick="window.builder.openJSON()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 13px;">OPEN EXISTING JSON</button>
+        </div>
+        
+        <div style="margin-top: 30px; font-size: 11px; color: #444;">
+          * Creating a new object will prompt you to pick a save location.
+        </div>
+      </div>
+    `;
+
+    document.getElementById('game-container')?.appendChild(modal);
+    (window as any).builder = this; // 전역 등록 보장
+  }
+
+  public async initNewProject() {
+    const nameInput = document.getElementById('new-project-name') as HTMLInputElement;
+    const name = nameInput?.value?.trim() || "Untitled_Object";
+    
+    this.projectName = name;
+    
+    try {
+      if ('showSaveFilePicker' in window) {
+        const now = new Date();
+        const dateStr = now.getFullYear() + 
+                        String(now.getMonth() + 1).padStart(2, '0') + 
+                        String(now.getDate()).padStart(2, '0') + 
+                        String(now.getHours()).padStart(2, '0') + 
+                        String(now.getMinutes()).padStart(2, '0') + 
+                        String(now.getSeconds()).padStart(2, '0');
+        
+        const defaultName = `${this.projectName}_${dateStr}.json`;
+        
+        this.fileHandle = await (window as any).showSaveFilePicker({
+          suggestedName: defaultName,
+          types: [{
+            description: 'JSON Files',
+            accept: { 'application/json': ['.json'] },
+          }],
+        });
+        
+        await this.saveToFile();
+        alert(`Project initialized: ${defaultName}`);
+      } else {
+        alert('File System Access API is not supported in this browser. Auto-save will use LocalStorage instead.');
+      }
+
+      this.completeInitialization();
+
+    } catch (err) {
+      console.error('Project initialization cancelled or failed:', err);
+    }
+  }
+
+  public startDirectly() {
+    const nameInput = document.getElementById('new-project-name') as HTMLInputElement;
+    this.projectName = nameInput?.value?.trim() || "Untitled_Object";
+    this.completeInitialization();
+  }
+
+  private completeInitialization() {
+    this.isInitialized = true;
+    const modal = document.getElementById('splash-modal');
+    modal?.remove();
+
+    if (!this.uiContainer) {
+      this.createUI();
+    }
+    this.uiContainer.style.display = 'flex';
+    this.updateUIPlacement();
+    this.updateUIHeader(); // 헤더 정보 동기화
+    this.renderPreview();
+    this.setupBeforeUnload();
+    this.startAutoSave();
+  }
+
+  private updateUIHeader() {
+    const nameEl = document.getElementById('ui-project-name');
+    const fileEl = document.getElementById('ui-file-info');
+    if (nameEl) nameEl.textContent = `[ ${this.projectName} ]`;
+    if (fileEl) {
+      fileEl.textContent = `File: ${this.fileHandle ? this.fileHandle.name : 'No file linked'}`;
+    }
+  }
+
+  private setupBeforeUnload() {
+    window.addEventListener('beforeunload', (e) => {
+      if (this.shapes.length > 0) {
+        e.preventDefault();
+        e.returnValue = ''; 
+      }
+    });
+  }
+
+  private startAutoSave() {
+    if (this.autoSaveTimer) clearInterval(this.autoSaveTimer);
+    this.autoSaveTimer = setInterval(() => {
+      this.saveToFile();
+      console.log('Auto-saved at ' + new Date().toLocaleTimeString());
+    }, 5 * 60 * 1000); 
+  }
+
+  private async saveToFile() {
+    const exportData = {
+        version: "1.0.0",
+        projectName: this.projectName,
+        timestamp: new Date().toISOString(),
+        shapes: this.shapes,
+        code: this.getGeneratedCode()
+    };
+    const data = JSON.stringify(exportData, null, 2);
+
+    if (this.fileHandle) {
+      try {
+        const writable = await this.fileHandle.createWritable();
+        await writable.write(data);
+        await writable.close();
+      } catch (err) {
+        console.error('Auto-save failed:', err);
+      }
+    } else {
+      localStorage.setItem(`backup_${this.projectName}`, data);
+    }
+  }
+
+  public saveToFileWithNotice() {
+    this.saveToFile().then(() => {
+      alert('Project saved successfully!');
+    });
   }
 
   private updateUIPlacement() {
@@ -716,6 +947,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         >
           <div style="display: flex; align-items: center; gap: 8px; flex: 1; overflow: hidden;">
             <span style="color: #555; cursor: grab; font-size: 14px;" title="Drag to reorder list only">☰</span>
+            <span style="font-size: 18px; filter: grayscale(1); opacity: 0.6;">${this.getShapeIcon(s.type)}</span>
             <span style="color: #aaa; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${s.name || s.type.toUpperCase()}</span>
           </div>
           <div style="display: flex; align-items: center; gap: 6px;">
@@ -725,6 +957,21 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         </div>
       `;
     }).join('');
+  }
+
+  private getShapeIcon(type: string): string {
+    const icons: Record<string, string> = {
+      rect: '■',
+      roundedRect: '▢',
+      circle: '●',
+      triangle: '▲',
+      rightTriangle: '◥',
+      mirroredRightTriangle: '◤',
+      trapezoid: '⬔',
+      pentagon: '⬠',
+      hexagon: '⬢'
+    };
+    return icons[type] || '⬡';
   }
 
   private renderInspector() {
@@ -954,10 +1201,11 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       } else if (s.type === 'circle') {
         hw = hh = s.radius || 25;
         g.fillCircle(0, 0, hw);
-      } else if (s.type === 'triangle' || s.type === 'rightTriangle') {
+      } else if (s.type === 'triangle' || s.type === 'rightTriangle' || s.type === 'mirroredRightTriangle') {
         hw = s.width / 2; hh = s.height / 2;
         if (s.type === 'triangle') g.fillTriangle(0, -hh, -hw, hh, hw, hh);
-        else g.fillTriangle(-hw, -hh, hw, -hh, -hw, hh);
+        else if (s.type === 'rightTriangle') g.fillTriangle(-hw, -hh, hw, -hh, -hw, hh);
+        else if (s.type === 'mirroredRightTriangle') g.fillTriangle(-hw, -hh, hw, -hh, hw, hh);
       } else if (s.type === 'trapezoid') {
         hw = s.width / 2; hh = s.height / 2;
         const aL = (s.angleLeft || 60) * (Math.PI / 180);
@@ -1150,13 +1398,25 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       }
     } else if (s.type === 'circle') {
       g.strokeCircle(s.x, s.y, (s.radius || 25) + d);
+    } else if (s.type === 'triangle') {
+      const hh = s.height / 2 + d, hw = s.width / 2 + d;
+      const points = [toWorld(0, -hh), toWorld(-hw, hh), toWorld(hw, hh)];
+      g.strokePoints(points, true);
+    } else if (s.type === 'rightTriangle') {
+      const hh = s.height / 2 + d, hw = s.width / 2 + d;
+      const points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(-hw, hh)];
+      g.strokePoints(points, true);
+    } else if (s.type === 'mirroredRightTriangle') {
+      const hh = s.height / 2 + d, hw = s.width / 2 + d;
+      const points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(hw, hh)];
+      g.strokePoints(points, true);
     } else if (s.type === 'trapezoid') {
       const hw = s.width / 2 + d;
       const hh = s.height / 2 + d;
       const aL = (s.angleLeft || 60) * (Math.PI / 180);
       const aR = (s.angleRight || 60) * (Math.PI / 180);
-      const dxL = hh * 2 / Math.tan(aL);
-      const dxR = hh * 2 / Math.tan(aR);
+      const dxL = (hh * 2) / Math.tan(aL);
+      const dxR = (hh * 2) / Math.tan(aR);
       const points = [
         toWorld(-hw, -hh), toWorld(hw, -hh), 
         toWorld(hw + dxR, hh), toWorld(-hw - dxL, hh)
@@ -1165,8 +1425,6 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     } else if (s.type === 'pentagon' || s.type === 'hexagon') {
       const sides = s.type === 'pentagon' ? 5 : 6;
       const points = [];
-      
-      // 오프셋이 적용된 내부 치수 계산
       let hw_i = (s.width / 2 + d);
       let hh_i = (s.height / 2 + d);
       let y_offset = 0;
@@ -1176,7 +1434,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       } else if (s.type === 'pentagon') {
         hw_i = hw_i / 0.951056;
         hh_i = hh_i / 0.904508;
-        y_offset = (hh_i * (0.809017 - 1)) / 2;
+        y_offset = (hh_i * (Math.sin(54 * Math.PI / 180) - 1)) / 2;
       }
 
       for (let i = 0; i < sides; i++) {
@@ -1194,6 +1452,14 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     g.lineBetween(s.x, s.y - 5, s.x, s.y + 5);
     g.fillStyle(0xffffff, 1);
     g.fillCircle(s.x, s.y, 3);
+  }
+
+  public showProjectInfo() {
+    if (this.fileHandle) {
+      alert(`[ INFO ]\n\nProject: ${this.projectName}\nFile: ${this.fileHandle.name}\n\n* Auto-save is active (every 5 mins).`);
+    } else {
+      alert(`[ INFO ]\n\nProject: ${this.projectName}\nSaving to: LocalStorage (Backup)`);
+    }
   }
 
   public copyCode() {
@@ -1234,6 +1500,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         code += `graphics.fillTriangle(0, ${-s.height / 2}, ${-s.width / 2}, ${s.height / 2}, ${s.width / 2}, ${s.height / 2});\n`;
       } else if (s.type === 'rightTriangle') {
         code += `graphics.fillTriangle(${-s.width / 2}, ${-s.height / 2}, ${s.width / 2}, ${-s.height / 2}, ${-s.width / 2}, ${s.height / 2});\n`;
+      } else if (s.type === 'mirroredRightTriangle') {
+        code += `graphics.fillTriangle(${-s.width / 2}, ${-s.height / 2}, ${s.width / 2}, ${-s.height / 2}, ${s.width / 2}, ${s.height / 2});\n`;
       } else if (s.type === 'trapezoid') {
         const hh = s.height / 2, hw = s.width / 2;
         const aL = (s.angleLeft || 60) * (Math.PI / 180), aR = (s.angleRight || 60) * (Math.PI / 180);
