@@ -507,7 +507,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     // 1. 좌측 패널 (도형 목록 및 추가)
     const leftPanel = document.createElement('div');
     leftPanel.style.cssText = `
-      width: 250px; background: rgba(15, 15, 20, 0.95);
+      width: 300px; background: rgba(15, 15, 20, 0.95);
       border-right: 1px solid #333; padding: 20px;
       pointer-events: auto; overflow-y: auto; height: 100vh;
       display: flex; flex-direction: column; box-sizing: border-box;
@@ -561,7 +561,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     const rightPanel = document.createElement('div');
     rightPanel.id = 'inspector-panel';
     rightPanel.style.cssText = `
-      width: 250px; background: rgba(15, 15, 20, 0.95);
+      width: 300px; background: rgba(15, 15, 20, 0.95);
       border-left: 1px solid #333; padding: 25px;
       pointer-events: auto; display: none; height: 100vh; box-sizing: border-box;
       box-shadow: -10px 0 30px rgba(0,0,0,0.5);
@@ -619,13 +619,13 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
         <div style="display: flex; flex-direction: column; gap: 12px;">
           <button onclick="window.builder.initNewProject()" style="width: 100%; padding: 15px; background: #ff3366; color: #fff; border: none; border-radius: 6px; cursor: pointer; font-weight: bold; font-size: 14px; transition: 0.2s;">CREATE NEW OBJECT</button>
-          <button onclick="window.builder.startDirectly()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #ff3366; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">JUST START (NO FILE)</button>
+          <button onclick="window.builder.openJSON()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 13px;">OPEN EXISTING JSON</button>
           <div style="display: flex; align-items: center; gap: 10px; margin: 10px 0;">
             <div style="flex: 1; height: 1px; background: #333;"></div>
             <span style="font-size: 11px; color: #444;">OR</span>
             <div style="flex: 1; height: 1px; background: #333;"></div>
           </div>
-          <button onclick="window.builder.openJSON()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-size: 13px;">OPEN EXISTING JSON</button>
+          <button onclick="window.builder.startDirectly()" style="width: 100%; padding: 12px; background: #333; color: #fff; border: 1px solid #ff3366; border-radius: 6px; cursor: pointer; font-size: 13px; font-weight: bold;">JUST START (NO FILE)</button>
         </div>
         
         <div style="margin-top: 30px; font-size: 11px; color: #444;">
