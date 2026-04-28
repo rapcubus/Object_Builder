@@ -5,7 +5,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "postbuild": "node scripts/package-itch.js",
+    "package:itch": "node scripts/package-itch.js",
     "preview": "vite preview"
   },
   "dependencies": {
