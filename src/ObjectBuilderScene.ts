@@ -554,6 +554,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
           <button onclick="window.builder.showProjectInfo()" style="padding: 10px; background: #222; border: 1px solid #444; color: #777; cursor: pointer; border-radius: 4px; font-size: 11px;">INFO</button>
           <button onclick="window.builder.undo()" style="padding: 10px; background: #333; border: 1px solid #444; color: #fff; cursor: pointer; border-radius: 4px; font-size: 11px;">UNDO (Ctrl+Z)</button>
         </div>
+        <div style="margin-top: 15px; font-size: 9px; color: #fff; opacity: 0.5; text-align: center; letter-spacing: 0.5px;">
+          © 2026 RAPCUBUS LAB
+        </div>
       </div>
     `;
 
@@ -630,6 +633,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         
         <div style="margin-top: 30px; font-size: 11px; color: #444;">
           * Creating a new object will prompt you to pick a save location.
+        </div>
+        <div style="margin-top: 20px; font-size: 10px; color: #fff; opacity: 0.5; letter-spacing: 1px;">
+          © 2026 RAPCUBUS LAB. All Rights Reserved.
         </div>
       </div>
     `;
