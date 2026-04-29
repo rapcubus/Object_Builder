@@ -155,7 +155,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const validDepths = shapes.map(s => Number(s.depth)).filter(d => !isNaN(d));
     const maxDepth = validDepths.length > 0 ? Math.max(...validDepths) : -1;
 
-    selectedShapeIds.forEach((id, index) => {
+    Array.from(selectedShapeIds).forEach((id, index) => {
       const shape = shapes.find(s => s.id === id);
       if (shape) {
         // 명시적으로 필요한 속성만 추출하여 새 객체 생성 (오염 방지)

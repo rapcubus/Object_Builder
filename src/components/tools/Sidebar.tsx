@@ -139,9 +139,9 @@ const Sidebar: React.FC = () => {
                               {/* Right: Controls & Depth */}
                               <div className="flex items-center gap-3 shrink-0 ml-4">
                                 <div className="flex flex-col items-end pr-2 border-r border-white/5">
-                                  <span className="text-[8px] text-gray-600 uppercase font-black tracking-tighter">Depth</span>
+                                  <span className="text-[9px] text-gray-600 uppercase font-bold tracking-tighter">Depth</span>
                                   <span className="text-[12px] text-[#ff3366] font-black font-mono leading-none mt-0.5">
-                                    {shape.depth}
+                                    {Number(shape.depth)}
                                   </span>
                                 </div>
                                 
