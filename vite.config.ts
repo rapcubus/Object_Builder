@@ -7,7 +7,7 @@ export default defineConfig(({ command }) => ({
     react(),
     tailwindcss(),
   ],
-  base: command === 'serve' ? '/' : './', // 개발 시엔 '/', 빌드 시엔 './' 사용
+  base: command === 'build' ? './' : '/', // 빌드 시에만 상대 경로, 개발 시엔 절대 경로 사용
   build: {
     outDir: 'dist',
     emptyOutDir: true,
