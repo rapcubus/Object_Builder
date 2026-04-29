@@ -33,7 +33,7 @@ jobs:
         run: npm install
 
       - name: Build
-        run: npm run build -- --base=/Object_Builder/
+        run: npm run build
 
       - name: Setup Pages
         uses: actions/configure-pages@v4
