@@ -52,7 +52,10 @@ const Toolbar: React.FC = () => {
         <div className="flex items-center gap-2 bg-[#1a1a1f] px-3 py-1.5 rounded-lg border border-white/5">
             <span className="text-xs text-gray-600 uppercase font-bold tracking-tighter">Project</span>
             <div className="flex items-center gap-2 group">
+                <label htmlFor="project-name-header" className="sr-only">Project Name</label>
                 <input 
+                    id="project-name-header"
+                    name="project-name-header"
                     type="text" 
                     value={projectName} 
                     onChange={(e) => setProjectName(e.target.value)}

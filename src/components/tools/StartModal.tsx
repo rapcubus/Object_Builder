@@ -55,8 +55,10 @@ const StartModal: React.FC = () => {
 
         <div className="space-y-6">
             <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-600 uppercase tracking-widest px-1">Project Name</label>
+                <label htmlFor="start-project-name" className="text-xs font-bold text-gray-600 uppercase tracking-widest px-1 cursor-pointer">Project Name</label>
                 <input 
+                    id="start-project-name"
+                    name="start-project-name"
                     type="text" 
                     placeholder="Input Object Name..."
                     value={localName}
