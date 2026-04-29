@@ -10,6 +10,17 @@ const Inspector: React.FC = () => {
   const isSingleSelect = selectedShapeIds.size === 1;
   const target = isSingleSelect ? selectedShapes[0] : null;
 
+  // Local state for numeric inputs to handle negative signs and empty values
+  const [tempX, setTempX] = React.useState(target?.x.toString() || '0');
+  const [tempY, setTempY] = React.useState(target?.y.toString() || '0');
+
+  React.useEffect(() => {
+    if (target) {
+      setTempX(target.x.toString());
+      setTempY(target.y.toString());
+    }
+  }, [target?.id, target?.x, target?.y]);
+
   if (selectedShapeIds.size === 0) {
     return (
       <div className="w-80 bg-[#0f0f14] border-l border-white/10 flex flex-col h-full shadow-2xl z-10">
@@ -91,9 +102,21 @@ const Inspector: React.FC = () => {
                         <input 
                             id="pos-x"
                             name="pos-x"
-                            type="number" 
-                            value={target.x} 
-                            onChange={(e) => updateSelectedShapes({ x: Number(e.target.value) })}
+                            type="text" 
+                            value={tempX} 
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setTempX(val);
+                                if (val !== "" && val !== "-" && !isNaN(Number(val))) {
+                                    updateSelectedShapes({ x: Number(val) });
+                                }
+                            }}
+                            onBlur={() => {
+                                if (tempX === "" || tempX === "-") {
+                                    updateSelectedShapes({ x: 0 });
+                                    setTempX("0");
+                                }
+                            }}
                             className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg pl-6 pr-2 py-2 text-xs font-mono text-cyan-400 focus:border-cyan-500/50 outline-none"
                         />
                     </div>
@@ -102,9 +125,21 @@ const Inspector: React.FC = () => {
                         <input 
                             id="pos-y"
                             name="pos-y"
-                            type="number" 
-                            value={target.y} 
-                            onChange={(e) => updateSelectedShapes({ y: Number(e.target.value) })}
+                            type="text" 
+                            value={tempY} 
+                            onChange={(e) => {
+                                const val = e.target.value;
+                                setTempY(val);
+                                if (val !== "" && val !== "-" && !isNaN(Number(val))) {
+                                    updateSelectedShapes({ y: Number(val) });
+                                }
+                            }}
+                            onBlur={() => {
+                                if (tempY === "" || tempY === "-") {
+                                    updateSelectedShapes({ y: 0 });
+                                    setTempY("0");
+                                }
+                            }}
                             className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg pl-6 pr-2 py-2 text-xs font-mono text-cyan-400 focus:border-cyan-500/50 outline-none"
                         />
                     </div>
