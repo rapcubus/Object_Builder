@@ -73,11 +73,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateShape: (id, props) => {
     set((state) => {
-      let newShapes = state.shapes.map(s => s.id === id ? { ...s, ...props } : s);
+      // NaN 방지: 숫자 필드인 경우 체크
+      const sanitizedProps = { ...props };
+      if (sanitizedProps.x !== undefined && isNaN(sanitizedProps.x)) sanitizedProps.x = 0;
+      if (sanitizedProps.y !== undefined && isNaN(sanitizedProps.y)) sanitizedProps.y = 0;
+      if (sanitizedProps.width !== undefined && isNaN(sanitizedProps.width)) sanitizedProps.width = 10;
+      if (sanitizedProps.height !== undefined && isNaN(sanitizedProps.height)) sanitizedProps.height = 10;
+      if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
+
+      let newShapes = state.shapes.map(s => s.id === id ? { ...s, ...sanitizedProps } : s);
 
       // depth가 변경된 경우 재정렬
-      if (props.depth !== undefined) {
-        newShapes.sort((a, b) => (a.depth || 0) - (b.depth || 0));
+      if (sanitizedProps.depth !== undefined) {
+        newShapes.sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0));
       }
 
       return { shapes: newShapes };
@@ -87,11 +95,17 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   updateSelectedShapes: (props) => {
     get().saveHistory();
     set((state) => {
-      let newShapes = state.shapes.map(s => state.selectedShapeIds.has(s.id) ? { ...s, ...props } : s);
+      // NaN 방지
+      const sanitizedProps = { ...props };
+      if (sanitizedProps.x !== undefined && isNaN(sanitizedProps.x)) sanitizedProps.x = 0;
+      if (sanitizedProps.y !== undefined && isNaN(sanitizedProps.y)) sanitizedProps.y = 0;
+      if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
+
+      let newShapes = state.shapes.map(s => state.selectedShapeIds.has(s.id) ? { ...s, ...sanitizedProps } : s);
 
       // depth가 변경된 경우 재정렬
-      if (props.depth !== undefined) {
-        newShapes.sort((a, b) => (a.depth || 0) - (b.depth || 0));
+      if (sanitizedProps.depth !== undefined) {
+        newShapes.sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0));
       }
 
       return { shapes: newShapes };
@@ -128,8 +142,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const newShapes: Shape[] = [];
     const newSelectedIds = new Set<string>();
 
-    // 현재 최대 뎁스 확인
-    const maxDepth = shapes.length > 0 ? Math.max(...shapes.map(s => s.depth || 0)) : -1;
+    // 현재 최대 뎁스 확인 (NaN 제외)
+    const validDepths = shapes.map(s => Number(s.depth)).filter(d => !isNaN(d));
+    const maxDepth = validDepths.length > 0 ? Math.max(...validDepths) : -1;
 
     selectedShapeIds.forEach((id, index) => {
       const shape = shapes.find(s => s.id === id);
@@ -138,8 +153,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           ...JSON.parse(JSON.stringify(shape)),
           id: 'shape_' + (Date.now() + Math.random()),
           name: `${shape.name || shape.type.toUpperCase()} (Copy)`,
-          x: shape.x + 10,
-          y: shape.y + 10,
+          x: (Number(shape.x) || 0) + 10,
+          y: (Number(shape.y) || 0) + 10,
           depth: maxDepth + 1 + index
         };
         newShapes.push(newShape);
@@ -147,7 +162,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
     });
 
-    const nextShapes = [...shapes, ...newShapes].sort((a, b) => (a.depth || 0) - (b.depth || 0));
+    const nextShapes = [...shapes, ...newShapes].sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0));
 
     set({
       shapes: nextShapes,
