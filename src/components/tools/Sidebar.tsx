@@ -123,7 +123,7 @@ const Sidebar: React.FC = () => {
                                 }
                               `}
                             >
-                              <div className="flex items-center gap-2 overflow-hidden">
+                              <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <div className="text-gray-800 shrink-0">
                                   <GripVertical size={14} />
                                 </div>
@@ -131,15 +131,23 @@ const Sidebar: React.FC = () => {
                                   className="w-2.5 h-2.5 rounded-full shrink-0" 
                                   style={{ backgroundColor: shape.color, opacity: shape.alpha }}
                                 />
-                                <span className="text-xs truncate font-medium tracking-tight">
-                                  {shape.name || shape.type.toUpperCase()}
-                                </span>
+                                <div className="flex flex-col min-w-0">
+                                  <span className="text-[11px] font-bold text-white truncate">
+                                    {shape.name || shape.type.toUpperCase()}
+                                  </span>
+                                  <span className="text-[9px] text-gray-500 font-mono truncate">
+                                    {shape.id}
+                                  </span>
+                                </div>
                               </div>
                               
-                              <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-[10px] text-[#ff3366] font-mono bg-[#ff3366]/5 px-1.5 py-0.5 rounded border border-[#ff3366]/20">
-                                  D:{shape.depth}
-                                </span>
+                              <div className="flex items-center gap-2 shrink-0 ml-2">
+                                <div className="flex flex-col items-end">
+                                  <span className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter">Depth</span>
+                                  <span className="text-[11px] text-[#ff3366] font-black font-mono">
+                                    {shape.depth}
+                                  </span>
+                                </div>
                                 <div className="flex flex-col">
                                   <button 
                                       onClick={(e) => handleMove(e, shape.id, 'up')}
