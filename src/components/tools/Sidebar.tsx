@@ -32,12 +32,8 @@ const Sidebar: React.FC = () => {
 
   const onDragEnd = (result: DropResult) => {
     if (!result.destination) return;
-    
-    // 시각적 인덱스를 실제 shapes 배열 인덱스로 변환
-    // (리스트는 reverse 되어 있으므로)
     const sourceIndex = shapes.length - 1 - result.source.index;
     const destinationIndex = shapes.length - 1 - result.destination.index;
-    
     reorderShapes(sourceIndex, destinationIndex);
   };
 
@@ -65,7 +61,7 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Shape Addition */}
-      <div className="p-4 space-y-3">
+      <div className="p-4 space-y-3 border-b border-white/5">
         <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-widest px-2">Add Shape</h3>
         <div className="grid grid-cols-2 gap-2">
           {shapeButtons.map((btn) => (
@@ -84,15 +80,15 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Layer List */}
-      <div className="flex-1 overflow-hidden flex flex-col mt-4">
-        <div className="px-6 py-2 flex items-center justify-between">
-          <h3 className="text-xs font-semibold text-gray-600 uppercase tracking-widest flex items-center gap-2">
-            <Layers size={12} /> Layers
+      <div className="flex-1 overflow-hidden flex flex-col">
+        <div className="px-6 py-4 flex items-center justify-between border-b border-white/5 bg-black/10">
+          <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-widest flex items-center gap-2">
+            <Layers size={14} /> Layers
           </h3>
-          <span className="text-xs text-gray-700 font-mono">{shapes.length} items</span>
+          <span className="text-[10px] text-gray-600 font-mono font-bold">{shapes.length} OBJECTS</span>
         </div>
         
-        <div className="flex-1 overflow-y-auto px-4 py-2 space-y-1 custom-scrollbar">
+        <div className="flex-1 overflow-y-auto px-2 py-2 space-y-1 custom-scrollbar">
           {shapes.length === 0 ? (
             <div className="py-12 text-center">
               <div className="text-gray-800 mb-2 flex justify-center"><Plus size={24} /></div>
@@ -116,54 +112,56 @@ const Sidebar: React.FC = () => {
                               {...provided.dragHandleProps}
                               onClick={(e) => selectShape(shape.id, e.shiftKey)}
                               className={`
-                                group flex items-center justify-between p-3 rounded-lg cursor-pointer transition-all border
+                                group flex items-center p-2 rounded-lg cursor-pointer transition-all border
                                 ${isSelected 
-                                  ? 'bg-[#ff3366]/10 border-[#ff3366]/30 text-white' 
-                                  : snapshot.isDragging ? 'bg-[#1a1a1f] border-[#ff3366]/20' : 'bg-white/[0.02] border-transparent text-gray-400 hover:bg-white/[0.05] hover:text-gray-200'
+                                  ? 'bg-[#ff3366]/10 border-[#ff3366]/30 shadow-lg shadow-[#ff3366]/5' 
+                                  : snapshot.isDragging ? 'bg-[#1a1a1f] border-[#ff3366]/20' : 'bg-white/[0.02] border-transparent hover:bg-white/[0.05]'
                                 }
                               `}
                             >
-                              <div className="flex items-center gap-2 flex-1 min-w-0">
-                                <div className="text-gray-800 shrink-0">
-                                  <GripVertical size={14} />
-                                </div>
+                              {/* Left: Info */}
+                              <div className="flex items-center gap-3 flex-1 min-w-0">
+                                <GripVertical size={14} className="text-gray-700 shrink-0" />
                                 <div 
-                                  className="w-2.5 h-2.5 rounded-full shrink-0" 
+                                  className="w-3 h-3 rounded-full shrink-0 border border-white/10" 
                                   style={{ backgroundColor: shape.color, opacity: shape.alpha }}
                                 />
                                 <div className="flex flex-col min-w-0">
-                                  <span className="text-[11px] font-bold text-white truncate">
+                                  <span className={`text-[11px] font-bold truncate ${isSelected ? 'text-white' : 'text-gray-300'}`}>
                                     {shape.name || shape.type.toUpperCase()}
                                   </span>
-                                  <span className="text-[9px] text-gray-500 font-mono truncate">
-                                    {shape.id}
+                                  <span className="text-[9px] text-gray-600 uppercase font-bold tracking-widest truncate">
+                                    {shape.type}
                                   </span>
                                 </div>
                               </div>
                               
-                              <div className="flex items-center gap-2 shrink-0 ml-2">
-                                <div className="flex flex-col items-end">
-                                  <span className="text-[9px] text-gray-500 uppercase font-bold tracking-tighter">Depth</span>
-                                  <span className="text-[11px] text-[#ff3366] font-black font-mono">
+                              {/* Right: Controls & Depth */}
+                              <div className="flex items-center gap-3 shrink-0 ml-4">
+                                <div className="flex flex-col items-end pr-2 border-r border-white/5">
+                                  <span className="text-[8px] text-gray-600 uppercase font-black tracking-tighter">Depth</span>
+                                  <span className="text-[12px] text-[#ff3366] font-black font-mono leading-none mt-0.5">
                                     {shape.depth}
                                   </span>
                                 </div>
-                                <div className="flex flex-col">
+                                
+                                <div className="flex flex-col opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button 
                                       onClick={(e) => handleMove(e, shape.id, 'up')}
                                       disabled={originalIndex === shapes.length - 1}
-                                      className="p-0.5 hover:text-white disabled:opacity-20"
+                                      className="p-0.5 text-gray-500 hover:text-white disabled:opacity-10"
                                   >
                                       <ChevronUp size={12} />
                                   </button>
                                   <button 
                                       onClick={(e) => handleMove(e, shape.id, 'down')}
                                       disabled={originalIndex === 0}
-                                      className="p-0.5 hover:text-white disabled:opacity-20"
+                                      className="p-0.5 text-gray-500 hover:text-white disabled:opacity-10"
                                   >
                                       <ChevronDown size={12} />
                                   </button>
                                 </div>
+
                                 <button 
                                   onClick={(e) => { 
                                     e.stopPropagation(); 
@@ -174,7 +172,7 @@ const Sidebar: React.FC = () => {
                                       deleteShape(shape.id);
                                     }
                                   }}
-                                  className="p-1.5 hover:bg-red-500/20 hover:text-red-500 rounded transition-colors"
+                                  className="p-2 text-gray-600 hover:bg-red-500/20 hover:text-red-500 rounded-lg transition-all"
                                 >
                                   <Trash2 size={14} />
                                 </button>
@@ -194,12 +192,19 @@ const Sidebar: React.FC = () => {
       </div>
 
       {/* Footer Info */}
-      <div className="p-4 border-top border-white/5 bg-black/20">
-        <div className="bg-[#1a1a1f] p-3 rounded-lg border border-white/5">
-          <div className="text-xs text-gray-600 uppercase mb-1">Current Depth Range</div>
-          <div className="text-xs text-gray-400 font-mono flex justify-between">
-            <span>Min: 0</span>
-            <span>Max: {shapes.length > 0 ? shapes.length - 1 : 0}</span>
+      <div className="p-4 border-t border-white/5 bg-black/30">
+        <div className="bg-[#1a1a1f] p-3 rounded-xl border border-white/5">
+          <div className="text-[10px] text-gray-600 uppercase font-bold mb-1.5 tracking-widest">Stack Range</div>
+          <div className="text-xs text-gray-400 font-mono flex justify-between items-center">
+            <div className="flex flex-col">
+              <span className="text-[8px] text-gray-700 uppercase">Min</span>
+              <span>0</span>
+            </div>
+            <div className="w-8 h-px bg-white/5"></div>
+            <div className="flex flex-col items-end">
+              <span className="text-[8px] text-gray-700 uppercase">Max</span>
+              <span>{shapes.length > 0 ? shapes.length - 1 : 0}</span>
+            </div>
           </div>
         </div>
       </div>
