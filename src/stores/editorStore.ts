@@ -43,7 +43,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setFileHandle: (handle) => set({ fileHandle: handle }),
   setInitialized: (val) => set({ isInitialized: val }),
 
-  setShapes: (shapes) => set({ shapes }),
+  setShapes: (shapes) => {
+    // 전역적인 데이터 타입 검증 (NaN 및 문자열 혼입 방지)
+    const sanitized = shapes.map(s => ({
+      ...s,
+      x: Number(s.x) || 0,
+      y: Number(s.y) || 0,
+      depth: Number(s.depth) || 0
+    }));
+    set({ shapes: sanitized });
+  },
 
   addShape: (type) => {
     get().saveHistory();
