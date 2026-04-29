@@ -67,10 +67,12 @@ const Inspector: React.FC = () => {
           <div className="space-y-5">
             {/* Name */}
             <div className="space-y-2">
-                <label className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2">
+                <label htmlFor="layer-name" className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2 cursor-pointer">
                     <Hash size={12} /> Layer Name
                 </label>
                 <input 
+                    id="layer-name"
+                    name="layer-name"
                     type="text" 
                     value={target.name || ''} 
                     onChange={(e) => updateSelectedShapes({ name: e.target.value })}
@@ -85,8 +87,10 @@ const Inspector: React.FC = () => {
                 </label>
                 <div className="grid grid-cols-2 gap-3">
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono">X</span>
+                        <label htmlFor="pos-x" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono cursor-pointer">X</label>
                         <input 
+                            id="pos-x"
+                            name="pos-x"
                             type="number" 
                             value={target.x} 
                             onChange={(e) => updateSelectedShapes({ x: Number(e.target.value) })}
@@ -94,8 +98,10 @@ const Inspector: React.FC = () => {
                         />
                     </div>
                     <div className="relative">
-                        <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono">Y</span>
+                        <label htmlFor="pos-y" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono cursor-pointer">Y</label>
                         <input 
+                            id="pos-y"
+                            name="pos-y"
                             type="number" 
                             value={target.y} 
                             onChange={(e) => updateSelectedShapes({ y: Number(e.target.value) })}
@@ -113,19 +119,23 @@ const Inspector: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                     {target.type === 'circle' ? (
                         <div className="col-span-2 relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono">RADIUS</span>
+                            <label htmlFor="radius" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono cursor-pointer uppercase">Radius</label>
                             <input 
+                                id="radius"
+                                name="radius"
                                 type="number" 
                                 value={target.radius || 25} 
                                 onChange={(e) => updateSelectedShapes({ radius: Number(e.target.value) })}
-                                className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg pl-14 pr-2 py-2 text-xs font-mono text-green-400 focus:border-green-500/50 outline-none"
+                                className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg pl-16 pr-2 py-2 text-xs font-mono text-green-400 focus:border-green-500/50 outline-none"
                             />
                         </div>
                     ) : (
                         <>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono">W</span>
+                                <label htmlFor="dim-w" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono cursor-pointer">W</label>
                                 <input 
+                                    id="dim-w"
+                                    name="dim-w"
                                     type="number" 
                                     value={target.width} 
                                     onChange={(e) => updateSelectedShapes({ width: Number(e.target.value) })}
@@ -133,8 +143,10 @@ const Inspector: React.FC = () => {
                                 />
                             </div>
                             <div className="relative">
-                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono">H</span>
+                                <label htmlFor="dim-h" className="absolute left-3 top-1/2 -translate-y-1/2 text-xs text-gray-600 font-mono cursor-pointer">H</label>
                                 <input 
+                                    id="dim-h"
+                                    name="dim-h"
                                     type="number" 
                                     value={target.height} 
                                     onChange={(e) => updateSelectedShapes({ height: Number(e.target.value) })}
@@ -152,12 +164,14 @@ const Inspector: React.FC = () => {
                     {target.type === 'roundedRect' && (
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
-                                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                <label htmlFor="corner-radius" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
                                     <Maximize size={10} /> Corner Radius
                                 </label>
                                 <span className="text-xs text-gray-400 font-mono">{target.cornerRadius || 0}px</span>
                             </div>
                             <input 
+                                id="corner-radius"
+                                name="corner-radius"
                                 type="range" 
                                 min="0" max="100" step="1" 
                                 value={target.cornerRadius || 0} 
@@ -171,12 +185,14 @@ const Inspector: React.FC = () => {
                         <>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                    <label htmlFor="angle-left" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
                                         <Sliders size={10} /> Left Angle
                                     </label>
                                     <span className="text-xs text-gray-400 font-mono">{target.angleLeft || 60}°</span>
                                 </div>
                                 <input 
+                                    id="angle-left"
+                                    name="angle-left"
                                     type="range" 
                                     min="1" max="89" step="1" 
                                     value={target.angleLeft || 60} 
@@ -186,12 +202,14 @@ const Inspector: React.FC = () => {
                             </div>
                             <div className="space-y-2">
                                 <div className="flex justify-between items-center">
-                                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                    <label htmlFor="angle-right" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
                                         <Sliders size={10} /> Right Angle
                                     </label>
                                     <span className="text-xs text-gray-400 font-mono">{target.angleRight || 60}°</span>
                                 </div>
                                 <input 
+                                    id="angle-right"
+                                    name="angle-right"
                                     type="range" 
                                     min="1" max="89" step="1" 
                                     value={target.angleRight || 60} 
@@ -207,17 +225,21 @@ const Inspector: React.FC = () => {
             {/* Appearance */}
             <div className="space-y-4 pt-4 border-t border-white/5">
                 <div className="space-y-2">
-                    <label className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2">
+                    <label htmlFor="color-hex" className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2 cursor-pointer">
                         <Palette size={12} /> Style
                     </label>
                     <div className="flex gap-2">
                         <input 
+                            id="color-picker"
+                            name="color-picker"
                             type="color" 
                             value={target.color} 
                             onChange={(e) => updateSelectedShapes({ color: e.target.value })}
                             className="w-10 h-10 p-0 bg-transparent border-0 cursor-pointer overflow-hidden rounded-md"
                         />
                         <input 
+                            id="color-hex"
+                            name="color-hex"
                             type="text" 
                             value={target.color} 
                             onChange={(e) => updateSelectedShapes({ color: e.target.value })}
@@ -228,10 +250,12 @@ const Inspector: React.FC = () => {
 
                 <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-tighter">Opacity</label>
+                        <label htmlFor="opacity" className="text-xs font-bold text-gray-600 uppercase tracking-tighter cursor-pointer">Opacity</label>
                         <span className="text-xs text-gray-400 font-mono">{Math.round(target.alpha * 100)}%</span>
                     </div>
                     <input 
+                        id="opacity"
+                        name="opacity"
                         type="range" 
                         min="0" max="1" step="0.01" 
                         value={target.alpha} 
@@ -242,12 +266,14 @@ const Inspector: React.FC = () => {
 
                 <div className="space-y-2">
                     <div className="flex justify-between items-center">
-                        <label className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2">
+                        <label htmlFor="rotation" className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2 cursor-pointer">
                             <RotateCw size={12} /> Rotation
                         </label>
                         <span className="text-xs text-gray-400 font-mono">{target.rotation}°</span>
                     </div>
                     <input 
+                        id="rotation"
+                        name="rotation"
                         type="range" 
                         min="0" max="360" step="1" 
                         value={target.rotation} 
@@ -269,10 +295,12 @@ const Inspector: React.FC = () => {
                         </div>
                     </div>
                     <div className="space-y-2">
-                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                        <label htmlFor="depth" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
                             <Sliders size={10} /> Rendering Depth
                         </label>
                         <input 
+                            id="depth"
+                            name="depth"
                             type="number" 
                             value={target.depth} 
                             onChange={(e) => updateSelectedShapes({ depth: Number(e.target.value) })}
