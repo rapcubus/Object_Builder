@@ -7,7 +7,7 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: '/Object_Builder/', // GitHub Pages 배포를 위해 저장소 이름 설정
+  base: './', // GitHub Pages 및 로컬 환경 호환성을 위해 상대 경로 설정
   build: {
     outDir: 'dist',
     emptyOutDir: true,
