@@ -143,8 +143,8 @@ const Inspector: React.FC = () => {
                             </div>
                         </>
                     )}
+                </div>
             </div>
-        </div>
 
             {/* Shape Specific Props */}
             {(target.type === 'roundedRect' || target.type === 'trapezoid') && (
