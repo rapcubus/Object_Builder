@@ -149,12 +149,22 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     selectedShapeIds.forEach((id, index) => {
       const shape = shapes.find(s => s.id === id);
       if (shape) {
+        // 명시적으로 필요한 속성만 추출하여 새 객체 생성 (오염 방지)
         const newShape: Shape = {
-          ...JSON.parse(JSON.stringify(shape)),
           id: 'shape_' + (Date.now() + Math.random()),
           name: `${shape.name || shape.type.toUpperCase()} (Copy)`,
+          type: shape.type,
           x: (Number(shape.x) || 0) + 10,
           y: (Number(shape.y) || 0) + 10,
+          width: Number(shape.width) || 50,
+          height: Number(shape.height) || 50,
+          radius: Number(shape.radius) || 25,
+          cornerRadius: Number(shape.cornerRadius) || 5,
+          angleLeft: Number(shape.angleLeft) || 60,
+          angleRight: Number(shape.angleRight) || 60,
+          color: shape.color || '#ffa500',
+          alpha: Number(shape.alpha) || 1,
+          rotation: Number(shape.rotation) || 0,
           depth: Number(maxDepth) + 1 + index
         };
         newShapes.push(newShape);
