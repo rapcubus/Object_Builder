@@ -143,8 +143,65 @@ const Inspector: React.FC = () => {
                             </div>
                         </>
                     )}
-                </div>
             </div>
+
+            {/* Shape Specific Props */}
+            {(target.type === 'roundedRect' || target.type === 'trapezoid') && (
+                <div className="space-y-4 pt-2">
+                    {target.type === 'roundedRect' && (
+                        <div className="space-y-2">
+                            <div className="flex justify-between items-center">
+                                <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                    <Maximize size={10} /> Corner Radius
+                                </label>
+                                <span className="text-xs text-gray-400 font-mono">{target.cornerRadius || 0}px</span>
+                            </div>
+                            <input 
+                                type="range" 
+                                min="0" max="100" step="1" 
+                                value={target.cornerRadius || 0} 
+                                onChange={(e) => updateSelectedShapes({ cornerRadius: Number(e.target.value) })}
+                                className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                            />
+                        </div>
+                    )}
+
+                    {target.type === 'trapezoid' && (
+                        <>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                        <Sliders size={10} /> Left Angle
+                                    </label>
+                                    <span className="text-xs text-gray-400 font-mono">{target.angleLeft || 60}°</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="1" max="89" step="1" 
+                                    value={target.angleLeft || 60} 
+                                    onChange={(e) => updateSelectedShapes({ angleLeft: Number(e.target.value) })}
+                                    className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2">
+                                        <Sliders size={10} /> Right Angle
+                                    </label>
+                                    <span className="text-xs text-gray-400 font-mono">{target.angleRight || 60}°</span>
+                                </div>
+                                <input 
+                                    type="range" 
+                                    min="1" max="89" step="1" 
+                                    value={target.angleRight || 60} 
+                                    onChange={(e) => updateSelectedShapes({ angleRight: Number(e.target.value) })}
+                                    className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
+            )}
 
             {/* Appearance */}
             <div className="space-y-4 pt-4 border-t border-white/5">
