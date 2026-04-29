@@ -155,7 +155,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           name: `${shape.name || shape.type.toUpperCase()} (Copy)`,
           x: (Number(shape.x) || 0) + 10,
           y: (Number(shape.y) || 0) + 10,
-          depth: maxDepth + 1 + index
+          depth: Number(maxDepth) + 1 + index
         };
         newShapes.push(newShape);
         newSelectedIds.add(newShape.id);
