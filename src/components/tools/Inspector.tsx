@@ -144,10 +144,11 @@ const Inspector: React.FC = () => {
                         </>
                     )}
             </div>
+        </div>
 
             {/* Shape Specific Props */}
             {(target.type === 'roundedRect' || target.type === 'trapezoid') && (
-                <div className="space-y-4 pt-2">
+                <div className="space-y-4 pt-2 pb-2">
                     {target.type === 'roundedRect' && (
                         <div className="space-y-2">
                             <div className="flex justify-between items-center">
