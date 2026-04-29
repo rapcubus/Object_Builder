@@ -7,7 +7,6 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  base: './', // GitHub Pages 및 로컬 환경 호환성을 위해 상대 경로 설정
   build: {
     outDir: 'dist',
     emptyOutDir: true,
