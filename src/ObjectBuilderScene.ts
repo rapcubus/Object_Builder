@@ -198,6 +198,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
     // (260406) 마우스 기반 인터랙션 (다중 선택/해제/화면 이동)
     this.input.on('pointerdown', (pointer: Phaser.Input.Pointer, currentlyOver: any[]) => {
+      // (260429) UI 요소 위에서의 클릭은 무시
+      if (this.isPointerOverUI(pointer)) return;
+
       // (260407) 우클릭 또는 휠 클릭 시 화면 이동(Panning) 시작
       if (pointer.rightButtonDown() || pointer.middleButtonDown()) {
         this.isPanning = true;
@@ -243,6 +246,33 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         this.isBoxSelecting = false;
         this.dragStartPos = null;
         this.selectionBoxGraphics.clear();
+      }
+    });
+
+    // (260429) 마우스 휠 줌 기능 추가
+    this.input.on('wheel', (pointer: Phaser.Input.Pointer, gameObjects: any[], deltaX: number, deltaY: number, deltaZ: number) => {
+      if (this.isPointerOverUI(pointer)) return;
+      
+      const zoomStep = 0.1;
+      const oldZoom = this.cameras.main.zoom;
+      let newZoom = oldZoom;
+
+      if (deltaY > 0) {
+        newZoom = Math.max(oldZoom - zoomStep, 0.5);
+      } else {
+        newZoom = Math.min(oldZoom + zoomStep, 5.0);
+      }
+
+      if (newZoom !== oldZoom) {
+        // 마우스 위치의 월드 좌표 저장 (줌 전)
+        const worldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        
+        this.cameras.main.setZoom(newZoom);
+        
+        // 줌 변경 후 새로운 월드 좌표 계산 및 카메라 스크롤 조정 (포인터 중심 유지)
+        const newWorldPoint = this.cameras.main.getWorldPoint(pointer.x, pointer.y);
+        this.cameras.main.scrollX -= (newWorldPoint.x - worldPoint.x);
+        this.cameras.main.scrollY -= (newWorldPoint.y - worldPoint.y);
       }
     });
 
@@ -712,6 +742,17 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     if (fileEl) {
       fileEl.textContent = `File: ${this.fileHandle ? this.fileHandle.name : 'No file linked'}`;
     }
+  }
+
+  /**
+   * (260429) 포인터가 DOM UI 요소 위에 있는지 확인
+   * Phaser Canvas가 아닌 다른 DOM 요소가 클릭 타겟인 경우 true 반환
+   */
+  private isPointerOverUI(pointer: Phaser.Input.Pointer): boolean {
+    if (!pointer.event) return false;
+    const target = pointer.event.target as HTMLElement;
+    // 게임 캔버스가 아닌 다른 DOM 요소가 타겟이라면 UI 위에 있는 것으로 간주
+    return target && target !== this.game.canvas;
   }
 
   private setupBeforeUnload() {
@@ -1278,6 +1319,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       });
 
       g.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+          // (260429) UI 요소 위에서의 클릭은 무시 (메뉴 뒤 도형 선택 방지)
+          if (this.isPointerOverUI(pointer)) return;
+
           // 우측 버튼이 아닌 경우에만 선택 처리
           if (pointer.rightButtonDown()) return;
           
@@ -1293,6 +1337,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
       // (260406) 드래그 시작 시점의 스냅샷 캡처
       g.on('dragstart', (pointer: Phaser.Input.Pointer) => {
+          // (260429) UI 요소 위에서의 드래그 시작은 무시
+          if (this.isPointerOverUI(pointer)) return;
+
           this.isDragging = true;
           this.dragStartStates.clear();
           this.dragStartPointerPos = { x: pointer.worldX, y: pointer.worldY };
