@@ -233,13 +233,11 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
     sortedShapes.forEach((s, index) => {
       let g = this.graphicsMap.get(s.id);
-      let isNew = false;
 
       if (!g) {
         g = this.add.graphics();
         this.graphicsMap.set(s.id, g);
         this.previewContainer.add(g);
-        isNew = true;
 
         // 새 오브젝트인 경우에만 이벤트 설정 (한 번만)
         g.setData('id', s.id);
