@@ -4,46 +4,108 @@ import {
   Save, 
   FolderOpen, 
   Undo2, 
-  FileCode, 
   Settings,
   Edit3
 } from 'lucide-react';
 
 const Toolbar: React.FC = () => {
-  const { projectName, setProjectName, undo, undoStack } = useEditorStore();
+  const { projectName, setProjectName, undo, undoStack, shapes, fileHandle, setFileHandle } = useEditorStore();
 
-  const handleOpen = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const content = JSON.parse(event.target?.result as string);
-          if (content.shapes) {
-            useEditorStore.getState().setShapes(content.shapes);
-            if (content.projectName) {
-              useEditorStore.getState().setProjectName(content.projectName);
-            }
-          }
-        } catch (err) {
-          console.error("Failed to parse JSON", err);
-          alert("Invalid JSON file");
+  const handleOpen = async () => {
+    try {
+      if ('showOpenFilePicker' in window) {
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+          multiple: false
+        });
+        const file = await handle.getFile();
+        const content = JSON.parse(await file.text());
+        
+        if (content.shapes) {
+          useEditorStore.getState().setShapes(content.shapes);
+          useEditorStore.getState().setProjectName(content.projectName || file.name.replace('.json', ''));
+          useEditorStore.getState().setFileHandle(handle);
         }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+      } else {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const content = JSON.parse(event.target?.result as string);
+              if (content.shapes) {
+                useEditorStore.getState().setShapes(content.shapes);
+                useEditorStore.getState().setProjectName(content.projectName || file.name.replace('.json', ''));
+              }
+            } catch (err) {
+              console.error("Failed to parse JSON", err);
+              alert("Invalid JSON file");
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Open failed", err);
+      }
+    }
   };
 
-  const handleExport = () => {
-    // 임시 export 로직 (Zustand 스토어의 내용을 파일로 저장)
-    alert('Export logic will be integrated soon.');
+  const handleSave = async () => {
+    // 확장자가 없는 경우 붙여주기
+    const fileName = projectName.toLowerCase().endsWith('.json') 
+      ? projectName 
+      : `${projectName}.json`;
+
+    const data = JSON.stringify({ projectName, shapes }, null, 2);
+
+    try {
+      if (fileHandle) {
+        // 기존 파일이 있는 경우 덮어쓰기 확인
+        if (window.confirm(`기존 파일에 덮어씌우시겠습니까?`)) {
+          const writable = await fileHandle.createWritable();
+          await writable.write(data);
+          await writable.close();
+          alert('저장되었습니다.');
+        }
+      } else {
+        // 새 프로젝트인 경우 파일 저장 창 열기
+        if ('showSaveFilePicker' in window) {
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: fileName,
+            types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(data);
+          await writable.close();
+          setFileHandle(handle);
+          alert('저장되었습니다.');
+        } else {
+          // Fallback: Download
+          const blob = new Blob([data], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = fileName;
+          a.click();
+          URL.revokeObjectURL(url);
+        }
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Save failed", err);
+        alert("저장에 실패했습니다.");
+      }
+    }
   };
+
 
   return (
     <div className="h-14 bg-[#0f0f14] border-b border-white/10 flex items-center justify-between px-6 shadow-lg z-20">
@@ -86,15 +148,11 @@ const Toolbar: React.FC = () => {
             >
                 <FolderOpen size={16} /> Open
             </button>
-            <button className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium">
-                <Save size={16} /> Save
-            </button>
-            <div className="w-px h-4 bg-white/10 mx-1"></div>
             <button 
-                onClick={handleExport}
-                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#ff3366] text-white hover:bg-[#ff3366]/90 transition-all text-xs font-bold shadow-lg shadow-[#ff3366]/20"
+                onClick={handleSave}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium"
             >
-                <FileCode size={16} /> Export Code
+                <Save size={16} /> Save
             </button>
         </div>
       </div>

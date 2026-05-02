@@ -20,7 +20,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
   private dragStartStates: Map<string, { x: number; y: number }> = new Map();
   private dragStartPointerPos: { x: number; y: number } | null = null;
   private graphicsMap: Map<string, Phaser.GameObjects.Graphics> = new Map();
-
+  private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
+  private isKeyboardMoving: boolean = false;
+  private lastMoveTime: number = 0;
   private unsubscribe?: () => void;
 
   constructor() {
@@ -36,6 +38,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
     this.input.mouse?.disableContextMenu();
 
+    // 키보드 커서 키 설정
+    this.cursors = this.input.keyboard!.createCursorKeys();
+
     // 단축키 설정
     this.input.keyboard?.on('keydown-DELETE', () => {
       useEditorStore.getState().deleteSelectedShapes();
@@ -47,20 +52,12 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       }
     });
 
-    // 방향키 이동 처리
-    this.input.keyboard?.on('keydown', (event: KeyboardEvent) => {
-      this.handleKeyDown(event);
-    });
-
     // 마우스 이벤트 설정
     this.setupMouseEvents();
 
-    // Zustand 스토어 구독
-    this.unsubscribe = useEditorStore.subscribe((state, prevState) => {
-      // 도형 데이터가 변경되었거나 선택이 변경된 경우 재렌더링
-      if (state.shapes !== prevState.shapes || state.selectedShapeIds !== prevState.selectedShapeIds) {
-        this.renderPreview();
-      }
+    // Zustand 스토어 구독 (Zustand 5 호환을 위해 prevState 제거)
+    this.unsubscribe = useEditorStore.subscribe((_state) => {
+      this.renderPreview();
     });
 
     // 씬 파괴 시 구독 해제
@@ -79,6 +76,58 @@ export default class ObjectBuilderScene extends Phaser.Scene {
 
     // 초기 렌더링
     this.renderPreview();
+  }
+
+  update(_time: number, delta: number) {
+    this.handleKeyboardMovement(delta);
+  }
+
+  private handleKeyboardMovement(_delta: number) {
+    const store = useEditorStore.getState();
+    if (store.selectedShapeIds.size === 0) return;
+
+    const keys = this.cursors;
+    const up = keys.up.isDown;
+    const down = keys.down.isDown;
+    const left = keys.left.isDown;
+    const right = keys.right.isDown;
+
+    if (up || down || left || right) {
+      const now = Date.now();
+      const moveInterval = 500; // 사용자 요청: 500ms 간격
+
+      // 최초 누름 또는 500ms 경과 시 이동
+      if (!this.isKeyboardMoving || (now - this.lastMoveTime >= moveInterval)) {
+        if (!this.isKeyboardMoving) {
+          store.saveHistory();
+          this.isKeyboardMoving = true;
+        }
+
+        let dx = 0, dy = 0;
+        if (left) dx = -1;
+        else if (right) dx = 1;
+        if (up) dy = -1;
+        else if (down) dy = 1;
+
+        if (dx !== 0 || dy !== 0) {
+          this.applyMovement(dx, dy);
+          this.lastMoveTime = now;
+        }
+      }
+    } else {
+      this.isKeyboardMoving = false;
+    }
+  }
+
+  private applyMovement(dx: number, dy: number) {
+    const store = useEditorStore.getState();
+    const nextShapes = store.shapes.map(s => {
+      if (store.selectedShapeIds.has(s.id)) {
+        return { ...s, x: Math.round(s.x + dx), y: Math.round(s.y + dy) };
+      }
+      return s;
+    });
+    store.setShapes(nextShapes);
   }
 
   private isPointerOverUI(pointer: Phaser.Input.Pointer): boolean {
@@ -155,33 +204,6 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         cam.setZoom(newZoom);
       }
     });
-  }
-
-  private handleKeyDown(event: KeyboardEvent) {
-    const store = useEditorStore.getState();
-    if (store.selectedShapeIds.size === 0) return;
-    if (document.activeElement?.tagName === 'INPUT') return;
-
-    const step = event.shiftKey ? 10 : 1;
-    let dx = 0, dy = 0;
-
-    if (event.key === 'ArrowLeft') dx = -step;
-    else if (event.key === 'ArrowRight') dx = step;
-    else if (event.key === 'ArrowUp') dy = -step;
-    else if (event.key === 'ArrowDown') dy = step;
-
-    if (dx !== 0 || dy !== 0) {
-      store.updateSelectedShapes({ x: 0, y: 0 }); // 스냅샷 저장용 (더미) - 개선 필요
-      // 실제 이동 로직은 스토어에서 직접 수행하거나 여기서 수정 후 반영
-      const nextShapes = store.shapes.map(s => {
-        if (store.selectedShapeIds.has(s.id)) {
-          return { ...s, x: s.x + dx, y: s.y + dy };
-        }
-        return s;
-      });
-      store.setShapes(nextShapes);
-      event.preventDefault();
-    }
   }
 
   private drawGrid() {

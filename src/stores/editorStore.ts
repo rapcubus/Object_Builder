@@ -90,7 +90,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (sanitizedProps.height !== undefined && isNaN(sanitizedProps.height)) sanitizedProps.height = 10;
       if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
 
-      let newShapes = state.shapes.map(s => s.id === id ? { ...s, ...sanitizedProps } : s);
+      let newShapes = state.shapes.map(s => {
+        if (s.id !== id) return s;
+        const nextShape = { ...s, ...sanitizedProps };
+        
+        // 코너 레디어스 제한 (가로 세로 중 짧은 쪽의 1/2)
+        if (nextShape.type === 'roundedRect') {
+          const maxRadius = Math.min(nextShape.width, nextShape.height) / 2;
+          if ((nextShape.cornerRadius || 0) > maxRadius) {
+            nextShape.cornerRadius = maxRadius;
+          }
+        }
+        return nextShape;
+      });
 
       // depth가 변경된 경우 재정렬
       if (sanitizedProps.depth !== undefined) {
@@ -102,7 +114,6 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   },
 
   updateSelectedShapes: (props) => {
-    get().saveHistory();
     set((state) => {
       // NaN 방지
       const sanitizedProps = { ...props };
@@ -110,7 +121,19 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (sanitizedProps.y !== undefined && isNaN(sanitizedProps.y)) sanitizedProps.y = 0;
       if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
 
-      let newShapes = state.shapes.map(s => state.selectedShapeIds.has(s.id) ? { ...s, ...sanitizedProps } : s);
+      let newShapes = state.shapes.map(s => {
+        if (!state.selectedShapeIds.has(s.id)) return s;
+        const nextShape = { ...s, ...sanitizedProps };
+        
+        // 코너 레디어스 제한 (가로 세로 중 짧은 쪽의 1/2)
+        if (nextShape.type === 'roundedRect') {
+          const maxRadius = Math.min(nextShape.width, nextShape.height) / 2;
+          if ((nextShape.cornerRadius || 0) > maxRadius) {
+            nextShape.cornerRadius = maxRadius;
+          }
+        }
+        return nextShape;
+      });
 
       // depth가 변경된 경우 재정렬
       if (sanitizedProps.depth !== undefined) {

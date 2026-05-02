@@ -13,33 +13,56 @@ const StartModal: React.FC = () => {
     setInitialized(true);
   };
 
-  const handleOpenJson = () => {
-    const input = document.createElement('input');
-    input.type = 'file';
-    input.accept = '.json';
-    input.onchange = (e) => {
-      const file = (e.target as HTMLInputElement).files?.[0];
-      if (!file) return;
-
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        try {
-          const content = JSON.parse(event.target?.result as string);
-          if (content.shapes) {
-            useEditorStore.getState().setShapes(content.shapes);
-            if (content.projectName) {
-                useEditorStore.getState().setProjectName(content.projectName);
-            }
-            useEditorStore.getState().setInitialized(true);
-          }
-        } catch (err) {
-          console.error("Failed to parse JSON", err);
-          alert("Invalid JSON file");
+  const handleOpenJson = async () => {
+    try {
+      // File System Access API 지원 여부 확인
+      if ('showOpenFilePicker' in window) {
+        const [handle] = await (window as any).showOpenFilePicker({
+          types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }],
+          multiple: false
+        });
+        const file = await handle.getFile();
+        const content = JSON.parse(await file.text());
+        
+        if (content.shapes) {
+          useEditorStore.getState().setShapes(content.shapes);
+          useEditorStore.getState().setProjectName(content.projectName || file.name.replace('.json', ''));
+          useEditorStore.getState().setFileHandle(handle);
+          useEditorStore.getState().setInitialized(true);
         }
-      };
-      reader.readAsText(file);
-    };
-    input.click();
+      } else {
+        // Fallback for older browsers
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = '.json';
+        input.onchange = (e) => {
+          const file = (e.target as HTMLInputElement).files?.[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            try {
+              const content = JSON.parse(event.target?.result as string);
+              if (content.shapes) {
+                useEditorStore.getState().setShapes(content.shapes);
+                useEditorStore.getState().setProjectName(content.projectName || file.name.replace('.json', ''));
+                useEditorStore.getState().setInitialized(true);
+              }
+            } catch (err) {
+              console.error("Failed to parse JSON", err);
+              alert("Invalid JSON file");
+            }
+          };
+          reader.readAsText(file);
+        };
+        input.click();
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Failed to open file", err);
+        alert("Failed to open file");
+      }
+    }
   };
 
   return (
@@ -53,49 +76,32 @@ const StartModal: React.FC = () => {
             <div className="text-xs font-bold text-[#ff3366] uppercase tracking-[0.3em]">Next-Gen Editor</div>
         </div>
 
-        <div className="space-y-6">
-            <div className="space-y-2">
-                <label htmlFor="start-project-name" className="text-xs font-bold text-gray-600 uppercase tracking-widest px-1 cursor-pointer">Project Name</label>
-                <input 
-                    id="start-project-name"
-                    name="start-project-name"
-                    type="text" 
-                    placeholder="Input Object Name..."
-                    value={localName}
-                    onChange={(e) => setLocalName(e.target.value)}
-                    className="w-full bg-black/40 border border-white/10 rounded-xl px-4 py-3.5 text-white focus:border-[#ff3366] focus:ring-1 focus:ring-[#ff3366]/20 outline-none transition-all"
-                />
-            </div>
-
-            <div className="space-y-3 pt-4">
-                <button 
-                    onClick={handleStart}
-                    className="w-full flex items-center justify-center gap-3 py-4 rounded-xl bg-[#ff3366] text-white font-bold text-xs hover:bg-[#ff3366]/90 transition-all shadow-xl shadow-[#ff3366]/20"
-                >
-                    <Rocket size={18} /> CREATE NEW OBJECT
-                </button>
-                
-                <div className="flex items-center gap-3 py-2">
-                    <div className="flex-1 h-px bg-white/5"></div>
-                    <span className="text-xs text-gray-700 font-bold uppercase tracking-widest">OR</span>
-                    <div className="flex-1 h-px bg-white/5"></div>
+        <div className="space-y-4">
+            <button 
+                onClick={handleStart}
+                className="w-full flex items-center justify-center gap-4 py-6 rounded-2xl bg-[#ff3366] text-white font-black text-sm hover:bg-[#ff3366]/90 transition-all shadow-xl shadow-[#ff3366]/20 group"
+            >
+                <div className="p-2 bg-white/20 rounded-lg group-hover:scale-110 transition-transform">
+                    <Rocket size={20} />
                 </div>
-
-                <div className="grid grid-cols-2 gap-3">
-                    <button 
-                        onClick={handleOpenJson}
-                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 border border-white/10 text-gray-400 hover:bg-white/10 hover:text-white transition-all text-xs font-medium"
-                    >
-                        <FolderOpen size={16} /> Open JSON
-                    </button>
-                    <button 
-                        onClick={handleStart}
-                        className="flex items-center justify-center gap-2 py-3 rounded-xl bg-white/5 border border-[#ff3366]/30 text-[#ff3366] hover:bg-[#ff3366]/5 transition-all text-xs font-bold"
-                    >
-                        <Zap size={16} /> Just Start
-                    </button>
+                <div className="flex flex-col items-start">
+                    <span>START NEW PROJECT</span>
+                    <span className="text-[10px] font-medium opacity-60">새 프로젝트 시작하기</span>
                 </div>
-            </div>
+            </button>
+            
+            <button 
+                onClick={handleOpenJson}
+                className="w-full flex items-center justify-center gap-4 py-6 rounded-2xl bg-white/5 border border-white/10 text-gray-300 hover:bg-white/10 hover:text-white transition-all text-sm font-bold group"
+            >
+                <div className="p-2 bg-white/5 rounded-lg group-hover:scale-110 transition-transform">
+                    <FolderOpen size={20} />
+                </div>
+                <div className="flex flex-col items-start">
+                    <span>OPEN JSON FILE</span>
+                    <span className="text-[10px] font-medium opacity-60">기존 파일 불러오기</span>
+                </div>
+            </button>
         </div>
 
         <div className="mt-8 text-center border-t border-white/5 pt-6">

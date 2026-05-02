@@ -3,7 +3,7 @@ import { useEditorStore } from '../../stores/editorStore';
 import { Trash2, Copy, Sliders, Hash, Move, Maximize, RotateCw, Palette, Layers as LayersIcon } from 'lucide-react';
 
 const Inspector: React.FC = () => {
-  const { shapes, selectedShapeIds, updateSelectedShapes, deleteSelectedShapes, copySelectedShapes } = useEditorStore();
+  const { shapes, selectedShapeIds, updateSelectedShapes, deleteSelectedShapes, copySelectedShapes, saveHistory, setShapes } = useEditorStore();
 
   const selectedShapes = shapes.filter(s => selectedShapeIds.has(s.id));
   const isMultiSelect = selectedShapeIds.size > 1;
@@ -16,10 +16,62 @@ const Inspector: React.FC = () => {
 
   React.useEffect(() => {
     if (target) {
-      setTempX(target.x.toString());
-      setTempY(target.y.toString());
+      setTempX(Math.round(target.x).toString());
+      setTempY(Math.round(target.y).toString());
     }
   }, [target?.id, target?.x, target?.y]);
+
+  // Group rotation reference state
+  const groupRotationRef = React.useRef<{
+    centerX: number;
+    centerY: number;
+    initialShapes: { id: string; x: number; y: number; rotation: number }[];
+    initialReferenceRotation: number;
+  } | null>(null);
+
+  const handleGroupRotationStart = () => {
+    saveHistory();
+    if (selectedShapes.length === 0) return;
+    
+    // Calculate geometric center of selected shapes
+    const centerX = selectedShapes.reduce((sum, s) => sum + s.x, 0) / selectedShapes.length;
+    const centerY = selectedShapes.reduce((sum, s) => sum + s.y, 0) / selectedShapes.length;
+    
+    groupRotationRef.current = {
+      centerX,
+      centerY,
+      initialShapes: selectedShapes.map(s => ({ id: s.id, x: s.x, y: s.y, rotation: s.rotation })),
+      initialReferenceRotation: selectedShapes[0].rotation
+    };
+  };
+
+  const handleGroupRotationChange = (newVal: number) => {
+    if (!groupRotationRef.current) return;
+    
+    const { centerX, centerY, initialShapes, initialReferenceRotation } = groupRotationRef.current;
+    const deltaDeg = newVal - initialReferenceRotation;
+    const deltaRad = deltaDeg * (Math.PI / 180);
+    const cos = Math.cos(deltaRad);
+    const sin = Math.sin(deltaRad);
+    
+    const nextShapes = shapes.map(s => {
+      const initial = initialShapes.find(is => is.id === s.id);
+      if (initial) {
+        const dx = initial.x - centerX;
+        const dy = initial.y - centerY;
+        // Orbit position + Rotate individual shape
+        return {
+          ...s,
+          x: centerX + (dx * cos - dy * sin),
+          y: centerY + (dx * sin + dy * cos),
+          rotation: (initial.rotation + deltaDeg) % 360
+        };
+      }
+      return s;
+    });
+    
+    setShapes(nextShapes);
+  };
 
   if (selectedShapeIds.size === 0) {
     return (
@@ -58,8 +110,68 @@ const Inspector: React.FC = () => {
                 <h4 className="font-bold text-white mb-1">Group Edit</h4>
                 <p className="text-[11px] text-gray-500">Apply changes to {selectedShapeIds.size} layers simultaneously.</p>
              </div>
+
+             {/* Common Properties */}
+             <div className="space-y-5 pt-2">
+                <label className="text-xs font-bold text-gray-600 uppercase tracking-tighter flex items-center gap-2">
+                    <Palette size={12} /> Common Style
+                </label>
+                
+                {/* Color */}
+                <div className="space-y-2">
+                    <div className="flex gap-2">
+                        <input 
+                            type="color" 
+                            value={selectedShapes[0].color} 
+                            onMouseDown={() => saveHistory()}
+                            onChange={(e) => updateSelectedShapes({ color: e.target.value })}
+                            className="w-10 h-10 p-0 bg-transparent border-0 cursor-pointer overflow-hidden rounded-md"
+                        />
+                        <input 
+                            type="text" 
+                            value={selectedShapes[0].color} 
+                            onChange={(e) => updateSelectedShapes({ color: e.target.value })}
+                            className="flex-1 bg-[#1a1a1f] border border-white/10 rounded-lg px-3 py-2 text-[11px] font-mono text-white focus:border-[#ff3366] outline-none uppercase"
+                        />
+                    </div>
+                </div>
+
+                {/* Opacity */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest cursor-pointer">Opacity</label>
+                        <span className="text-xs text-gray-400 font-mono">{Math.round(selectedShapes[0].alpha * 100)}%</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        min="0" max="1" step="0.01" 
+                        value={selectedShapes[0].alpha} 
+                        onMouseDown={() => saveHistory()}
+                        onChange={(e) => updateSelectedShapes({ alpha: Number(e.target.value) })}
+                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-[#ff3366]"
+                    />
+                </div>
+
+                {/* Rotation */}
+                <div className="space-y-2">
+                    <div className="flex justify-between items-center">
+                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
+                            <RotateCw size={12} /> Rotation
+                        </label>
+                        <span className="text-xs text-gray-400 font-mono">{selectedShapes[0].rotation}°</span>
+                    </div>
+                    <input 
+                        type="range" 
+                        min="0" max="360" step="1" 
+                        value={selectedShapes[0].rotation} 
+                        onMouseDown={handleGroupRotationStart}
+                        onChange={(e) => handleGroupRotationChange(Number(e.target.value))}
+                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                    />
+                </div>
+             </div>
              
-             <div className="grid grid-cols-1 gap-2">
+             <div className="grid grid-cols-1 gap-2 pt-4 border-t border-white/5">
                 <button 
                     onClick={copySelectedShapes}
                     className="flex items-center justify-center gap-3 p-3 rounded-lg bg-cyan-500/10 border border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/20 transition-all text-xs font-bold"
@@ -208,8 +320,9 @@ const Inspector: React.FC = () => {
                                 id="corner-radius"
                                 name="corner-radius"
                                 type="range" 
-                                min="0" max="100" step="1" 
+                                min="0" max={Math.min(target.width, target.height) / 2} step="1" 
                                 value={target.cornerRadius || 0} 
+                                onMouseDown={() => saveHistory()}
                                 onChange={(e) => updateSelectedShapes({ cornerRadius: Number(e.target.value) })}
                                 className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
                             />
@@ -231,6 +344,7 @@ const Inspector: React.FC = () => {
                                     type="range" 
                                     min="1" max="89" step="1" 
                                     value={target.angleLeft || 60} 
+                                    onMouseDown={() => saveHistory()}
                                     onChange={(e) => updateSelectedShapes({ angleLeft: Number(e.target.value) })}
                                     className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
                                 />
@@ -248,6 +362,7 @@ const Inspector: React.FC = () => {
                                     type="range" 
                                     min="1" max="89" step="1" 
                                     value={target.angleRight || 60} 
+                                    onMouseDown={() => saveHistory()}
                                     onChange={(e) => updateSelectedShapes({ angleRight: Number(e.target.value) })}
                                     className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
                                 />
@@ -269,6 +384,7 @@ const Inspector: React.FC = () => {
                             name="color-picker"
                             type="color" 
                             value={target.color} 
+                            onMouseDown={() => saveHistory()}
                             onChange={(e) => updateSelectedShapes({ color: e.target.value })}
                             className="w-10 h-10 p-0 bg-transparent border-0 cursor-pointer overflow-hidden rounded-md"
                         />
@@ -294,6 +410,7 @@ const Inspector: React.FC = () => {
                         type="range" 
                         min="0" max="1" step="0.01" 
                         value={target.alpha} 
+                        onMouseDown={() => saveHistory()}
                         onChange={(e) => updateSelectedShapes({ alpha: Number(e.target.value) })}
                         className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-[#ff3366]"
                     />
@@ -312,6 +429,7 @@ const Inspector: React.FC = () => {
                         type="range" 
                         min="0" max="360" step="1" 
                         value={target.rotation} 
+                        onMouseDown={() => saveHistory()}
                         onChange={(e) => updateSelectedShapes({ rotation: Number(e.target.value) })}
                         className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-cyan-500"
                     />
