@@ -21,6 +21,11 @@ function sanitizeProps(props: Partial<Shape>, currentShape?: Shape): Partial<Sha
     if (merged.cornerRadius > maxRadius) s.cornerRadius = maxRadius;
   }
 
+  if (s.rotation !== undefined) {
+    s.rotation = Math.round(s.rotation % 360);
+    if (s.rotation < 0) s.rotation += 360;
+  }
+
   return s;
 }
 
