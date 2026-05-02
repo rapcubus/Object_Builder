@@ -32,7 +32,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
   create() {
     this.cameras.main.setBackgroundColor('#1a1a1f');
     this.gridGraphics = this.add.graphics();
-    this.previewContainer = this.add.container(0, 0);
+    // previewContainer depth를 1로 설정하여 격자(gridGraphics) 위에 렌더링 보장
+    this.previewContainer = this.add.container(0, 0).setDepth(1);
     this.selectionGraphics = this.add.graphics().setDepth(1000);
     this.selectionBoxGraphics = this.add.graphics().setDepth(1001);
 
@@ -55,10 +56,20 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     // 마우스 이벤트 설정
     this.setupMouseEvents();
 
-    // Zustand 스토어 구독 (Zustand 5 호환을 위해 prevState 제거)
-    this.unsubscribe = useEditorStore.subscribe((_state) => {
-      this.renderPreview();
+    // Zustand 스토어 구독 — shapes 또는 selectedShapeIds가 바뀔 때만 렌더링
+    // 드래그 중에는 건너뜀: drag → setShapes → renderPreview → setPosition → drag 재발동 루프 방지
+    let prevShapes = useEditorStore.getState().shapes;
+    let prevSelected = useEditorStore.getState().selectedShapeIds;
+    this.unsubscribe = useEditorStore.subscribe((state) => {
+      if (state.shapes !== prevShapes || state.selectedShapeIds !== prevSelected) {
+        prevShapes = state.shapes;
+        prevSelected = state.selectedShapeIds;
+        if (!this.isDragging) {
+          this.renderPreview();
+        }
+      }
     });
+
 
     // 씬 파괴 시 구독 해제
     this.events.once('destroy', () => {
@@ -206,7 +217,62 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     });
   }
 
+  // ─────────────────────────────────────────────────────────────
+  // 도형의 로컬 좌표 기준 꼭짓점 포인트를 반환하는 순수 함수
+  // offset: 선택 하이라이트용 팽창값 (기본 0)
+  // ─────────────────────────────────────────────────────────────
+  private getShapePoints(s: Shape, offset = 0): { x: number; y: number }[] | null {
+    const hw = s.width / 2 + offset;
+    const hh = s.height / 2 + offset;
+
+    if (s.type === 'rect' || s.type === 'roundedRect') {
+      return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }, { x: -hw, y: hh }];
+    }
+    if (s.type === 'circle') {
+      return null; // circle은 별도 처리
+    }
+    if (s.type === 'triangle') {
+      return [{ x: 0, y: -hh }, { x: -hw, y: hh }, { x: hw, y: hh }];
+    }
+    if (s.type === 'rightTriangle') {
+      return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: -hw, y: hh }];
+    }
+    if (s.type === 'mirroredRightTriangle') {
+      return [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw, y: hh }];
+    }
+    if (s.type === 'trapezoid') {
+      const baseHh = s.height / 2; // offset 없이 각도 계산
+      const aL = (s.angleLeft || 60) * (Math.PI / 180);
+      const aR = (s.angleRight || 60) * (Math.PI / 180);
+      const dxL = baseHh * 2 / Math.tan(aL);
+      const dxR = baseHh * 2 / Math.tan(aR);
+      return [
+        { x: -hw, y: -hh }, { x: hw, y: -hh },
+        { x: hw + dxR, y: hh }, { x: -hw - dxL, y: hh }
+      ];
+    }
+    if (s.type === 'pentagon' || s.type === 'hexagon') {
+      const sides = s.type === 'pentagon' ? 5 : 6;
+      let hw_i = hw, hh_i = hh, y_offset = 0;
+      if (s.type === 'hexagon') {
+        hw_i = hw / 0.866025;
+      } else {
+        hw_i = hw / 0.951056;
+        hh_i = hh / 0.904508;
+        y_offset = (hh_i * (Math.sin(54 * Math.PI / 180) - 1)) / 2;
+      }
+      const points = [];
+      for (let i = 0; i < sides; i++) {
+        const angle = (i * 2 * Math.PI / sides) - Math.PI / 2;
+        points.push({ x: hw_i * Math.cos(angle), y: hh_i * Math.sin(angle) - y_offset });
+      }
+      return points;
+    }
+    return null;
+  }
+
   private drawGrid() {
+
     this.gridGraphics.clear();
     this.gridGraphics.lineStyle(1, 0x333344, 0.5);
     const range = 2000;
@@ -264,6 +330,18 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         // 새 오브젝트인 경우에만 이벤트 설정 (한 번만)
         g.setData('id', s.id);
 
+        // ── 히트 영역 & 인터랙션은 최초 1회만 설정 ──────────────
+        const hitArea = new Phaser.Geom.Rectangle(-25, -25, 50, 50);
+        g.setInteractive({
+          hitArea,
+          hitAreaCallback: Phaser.Geom.Rectangle.Contains,
+          useHandCursor: true,
+          draggable: true
+        });
+        // hitArea 참조를 Data에 보관 (이후 위치만 갱신)
+        g.setData('hitArea', hitArea);
+        // ──────────────────────────────────────────────────────
+
         g.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
           if (pointer.rightButtonDown()) return;
           if (!useEditorStore.getState().selectedShapeIds.has(s.id) || pointer.event.shiftKey) {
@@ -277,11 +355,16 @@ export default class ObjectBuilderScene extends Phaser.Scene {
           this.dragStartStates.clear();
           this.dragStartPointerPos = { x: pointer.worldX, y: pointer.worldY };
 
-          // 최신 상태 확인 및 선택 업데이트 (필요 시)
           let currentStore = useEditorStore.getState();
           if (!currentStore.selectedShapeIds.has(s.id) && !pointer.event.shiftKey) {
             currentStore.selectShape(s.id);
-            currentStore = useEditorStore.getState(); // 상태 갱신
+            currentStore = useEditorStore.getState();
+          }
+
+          // 히스토리 저장 (1회)
+          if (!isDragHistorySaved) {
+            currentStore.saveHistory();
+            isDragHistorySaved = true;
           }
 
           // 현재 선택된 모든 도형의 시작 위치 저장
@@ -297,77 +380,63 @@ export default class ObjectBuilderScene extends Phaser.Scene {
           const totalDY = Math.round(pointer.worldY - this.dragStartPointerPos.y);
           if (totalDX === 0 && totalDY === 0) return;
 
-          const currentStore = useEditorStore.getState();
-          if (!isDragHistorySaved) {
-            currentStore.saveHistory();
-            isDragHistorySaved = true;
-          }
-
-          const nextShapes = currentStore.shapes.map(sh => {
-            const startState = this.dragStartStates.get(sh.id);
-            if (startState) {
-              return { ...sh, x: startState.x + totalDX, y: startState.y + totalDY };
+          // ── Zustand store에 쓰지 않고 Phaser 객체만 직접 이동 ──
+          // drag 중 setShapes 호출은 React 렌더 사이클과 충돌하여
+          // "Maximum update depth exceeded" 에러를 유발하므로 금지
+          this.dragStartStates.forEach((startState, id) => {
+            const gfx = this.graphicsMap.get(id);
+            if (gfx) {
+              gfx.setPosition(startState.x + totalDX, startState.y + totalDY);
             }
-            return sh;
           });
-          currentStore.setShapes(nextShapes);
 
           if (this.selectionGraphics) this.selectionGraphics.clear();
         });
 
         g.on('dragend', () => {
+          // dragend에서 최종 위치를 store에 딱 1회 커밋
+          const store = useEditorStore.getState();
+          const nextShapes = store.shapes.map(sh => {
+            const gfx = this.graphicsMap.get(sh.id);
+            if (gfx && this.dragStartStates.has(sh.id)) {
+              return { ...sh, x: Math.round(gfx.x), y: Math.round(gfx.y) };
+            }
+            return sh;
+          });
+          store.setShapes(nextShapes);
+
           this.isDragging = false;
           this.dragStartStates.clear();
           this.dragStartPointerPos = null;
           isDragHistorySaved = false;
           this.renderPreview();
         });
+
       }
 
       // 속성 업데이트 (매번 호출)
+      // 도형 그리기 (getShapePoints 활용)
       g.clear();
       const color = parseInt(s.color.replace('#', ''), 16);
       g.fillStyle(color, s.alpha);
 
-      let hw = 0, hh = 0;
-      if (s.type === 'rect' || s.type === 'roundedRect') {
-        hw = s.width / 2; hh = s.height / 2;
-        if (s.type === 'rect') g.fillRect(-hw, -hh, s.width, s.height);
-        else g.fillRoundedRect(-hw, -hh, s.width, s.height, s.cornerRadius || 0);
+      let hw = s.width / 2, hh = s.height / 2;
+
+      if (s.type === 'rect') {
+        g.fillRect(-hw, -hh, s.width, s.height);
+      } else if (s.type === 'roundedRect') {
+        g.fillRoundedRect(-hw, -hh, s.width, s.height, s.cornerRadius || 0);
       } else if (s.type === 'circle') {
         hw = hh = s.radius || 25;
         g.fillCircle(0, 0, hw);
-      } else if (s.type === 'triangle' || s.type === 'rightTriangle' || s.type === 'mirroredRightTriangle') {
-        hw = s.width / 2; hh = s.height / 2;
-        if (s.type === 'triangle') g.fillTriangle(0, -hh, -hw, hh, hw, hh);
-        else if (s.type === 'rightTriangle') g.fillTriangle(-hw, -hh, hw, -hh, -hw, hh);
-        else if (s.type === 'mirroredRightTriangle') g.fillTriangle(-hw, -hh, hw, -hh, hw, hh);
-      } else if (s.type === 'trapezoid') {
-        hw = s.width / 2; hh = s.height / 2;
-        const aL = (s.angleLeft || 60) * (Math.PI / 180);
-        const aR = (s.angleRight || 60) * (Math.PI / 180);
-        const dxL = hh * 2 / Math.tan(aL);
-        const dxR = hh * 2 / Math.tan(aR);
-        const points = [{ x: -hw, y: -hh }, { x: hw, y: -hh }, { x: hw + dxR, y: hh }, { x: -hw - dxL, y: hh }];
-        g.fillPoints(points, true);
-        const minX = Math.min(-hw, -hw - dxL);
-        const maxX = Math.max(hw, hw + dxR);
-        hw = (maxX - minX) / 2;
-      } else if (s.type === 'pentagon' || s.type === 'hexagon') {
-        const sides = s.type === 'pentagon' ? 5 : 6;
-        const points = [];
-        let hw_i = s.width / 2, hh_i = s.height / 2, y_offset = 0;
-        if (s.type === 'hexagon') { hw_i = (s.width / 2) / 0.866025; hh_i = s.height / 2; }
-        else if (s.type === 'pentagon') {
-          hw_i = (s.width / 2) / 0.951056; hh_i = (s.height / 2) / 0.904508;
-          y_offset = (hh_i * (Math.sin(54 * Math.PI / 180) - 1)) / 2;
+      } else {
+        const points = this.getShapePoints(s);
+        if (points) g.fillPoints(points, true);
+        // trapezoid의 경우 히트영역을 실제 바운딩 박스로 확장
+        if (s.type === 'trapezoid' && points) {
+          const xs = points.map(p => p.x);
+          hw = (Math.max(...xs) - Math.min(...xs)) / 2;
         }
-        for (let i = 0; i < sides; i++) {
-          const angle = (i * 2 * Math.PI / sides) - Math.PI / 2;
-          points.push({ x: hw_i * Math.cos(angle), y: hh_i * Math.sin(angle) - y_offset });
-        }
-        g.fillPoints(points, true);
-        hw = s.width / 2; hh = s.height / 2;
       }
 
       g.setPosition(s.x, s.y);
@@ -376,8 +445,12 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       // Depth 설정 (z-index)
       this.previewContainer.moveTo(g, index);
 
-      const hitArea = new Phaser.Geom.Rectangle(-hw, -hh, Math.max(hw * 2, 15), Math.max(hh * 2, 15));
-      g.setInteractive({ hitArea, hitAreaCallback: Phaser.Geom.Rectangle.Contains, useHandCursor: true, draggable: true });
+      // ── 히트 영역 좌표만 갱신 (setInteractive 재호출 없음) ────
+      const storedHitArea = g.getData('hitArea') as Phaser.Geom.Rectangle | undefined;
+      if (storedHitArea) {
+        storedHitArea.setTo(-hw, -hh, Math.max(hw * 2, 15), Math.max(hh * 2, 15));
+      }
+      // ────────────────────────────────────────────────────────
 
       if (selectedIds.has(s.id) && !this.isDragging) {
         this.drawSelectionHighlight(s);
@@ -385,49 +458,28 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     });
   }
 
+
   private drawSelectionHighlight(s: Shape) {
     if (!this.selectionGraphics) return;
     const g = this.selectionGraphics;
     g.lineStyle(2, 0xffffff, 1);
-    const d = 3;
+
+    const d = 3; // 하이라이트 �진 반경
     const rad = (s.rotation || 0) * (Math.PI / 180);
     const cos = Math.cos(rad), sin = Math.sin(rad);
+    // 로컈 좌표를 월드 좌표로 변환
     const toWorld = (px: number, py: number) => ({ x: s.x + (px * cos - py * sin), y: s.y + (px * sin + py * cos) });
 
-    if (s.type === 'rect' || s.type === 'roundedRect') {
-      const hw = s.width / 2 + d, hh = s.height / 2 + d;
-      const points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(hw, hh), toWorld(-hw, hh)];
-      g.strokePoints(points, true);
-    } else if (s.type === 'circle') {
+    if (s.type === 'circle') {
       g.strokeCircle(s.x, s.y, (s.radius || 25) + d);
-    } else if (s.type === 'triangle' || s.type === 'rightTriangle' || s.type === 'mirroredRightTriangle') {
-      const hh = s.height / 2 + d, hw = s.width / 2 + d;
-      let points = [];
-      if (s.type === 'triangle') points = [toWorld(0, -hh), toWorld(-hw, hh), toWorld(hw, hh)];
-      else if (s.type === 'rightTriangle') points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(-hw, hh)];
-      else points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(hw, hh)];
-      g.strokePoints(points, true);
-    } else if (s.type === 'trapezoid') {
-      const hw = s.width / 2 + d, hh = s.height / 2 + d;
-      const aL = (s.angleLeft || 60) * (Math.PI / 180), aR = (s.angleRight || 60) * (Math.PI / 180);
-      const dxL = (hh * 2) / Math.tan(aL), dxR = (hh * 2) / Math.tan(aR);
-      const points = [toWorld(-hw, -hh), toWorld(hw, -hh), toWorld(hw + dxR, hh), toWorld(-hw - dxL, hh)];
-      g.strokePoints(points, true);
-    } else if (s.type === 'pentagon' || s.type === 'hexagon') {
-      const sides = s.type === 'pentagon' ? 5 : 6;
-      const points = [];
-      let hw_i = (s.width / 2 + d), hh_i = (s.height / 2 + d), y_offset = 0;
-      if (s.type === 'hexagon') hw_i = hw_i / 0.866025;
-      else if (s.type === 'pentagon') {
-        hw_i = hw_i / 0.951056; hh_i = hh_i / 0.904508;
-        y_offset = (hh_i * (Math.sin(54 * Math.PI / 180) - 1)) / 2;
+    } else {
+      const points = this.getShapePoints(s, d);
+      if (points) {
+        g.strokePoints(points.map(p => toWorld(p.x, p.y)), true);
       }
-      for (let i = 0; i < sides; i++) {
-        const angle = (i * 2 * Math.PI / sides) - Math.PI / 2;
-        points.push(toWorld(hw_i * Math.cos(angle), hh_i * Math.sin(angle) - y_offset));
-      }
-      g.strokePoints(points, true);
     }
+
+    // 중심점 표시
     g.lineStyle(1, 0xffffff, 0.5);
     g.lineBetween(s.x - 5, s.y, s.x + 5, s.y);
     g.lineBetween(s.x, s.y - 5, s.x, s.y + 5);
@@ -458,8 +510,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       }
     });
 
-    setTimeout(() => {
-      useEditorStore.setState({ selectedShapeIds: nextSelectedIds });
-    }, 0);
+    // setTimeout 해킹 제거 — Zustand setState 직접 호출
+    useEditorStore.setState({ selectedShapeIds: nextSelectedIds });
   }
 }

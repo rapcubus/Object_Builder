@@ -1,16 +1,39 @@
 import { create } from 'zustand';
 import { Shape, ShapeType } from '../types/game';
 
+// ─────────────────────────────────────────────
+// 헬퍼: 숫자 필드 NaN 방지 및 cornerRadius 제한
+// ─────────────────────────────────────────────
+function sanitizeProps(props: Partial<Shape>, currentShape?: Shape): Partial<Shape> {
+  const s = { ...props };
+  if (s.x !== undefined && isNaN(s.x)) s.x = 0;
+  if (s.y !== undefined && isNaN(s.y)) s.y = 0;
+  if (s.width !== undefined && isNaN(s.width)) s.width = 10;
+  if (s.height !== undefined && isNaN(s.height)) s.height = 10;
+  if (s.depth !== undefined && isNaN(s.depth)) s.depth = 0;
+
+  // cornerRadius 제한 (roundedRect일 때만)
+  const merged = currentShape ? { ...currentShape, ...s } : s;
+  if (merged.type === 'roundedRect' && merged.cornerRadius !== undefined) {
+    const w = merged.width ?? currentShape?.width ?? 10;
+    const h = merged.height ?? currentShape?.height ?? 10;
+    const maxRadius = Math.min(w, h) / 2;
+    if (merged.cornerRadius > maxRadius) s.cornerRadius = maxRadius;
+  }
+
+  return s;
+}
+
 interface EditorState {
   shapes: Shape[];
   selectedShapeIds: Set<string>;
   projectName: string;
-  fileHandle: any | null;
+  fileHandle: FileSystemFileHandle | null;
   isInitialized: boolean;
 
   // Actions
   setProjectName: (name: string) => void;
-  setFileHandle: (handle: any | null) => void;
+  setFileHandle: (handle: FileSystemFileHandle | null) => void;
   setInitialized: (val: boolean) => void;
 
   addShape: (type: ShapeType) => void;
@@ -57,7 +80,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addShape: (type) => {
     get().saveHistory();
     const newShape: Shape = {
-      id: 'shape_' + Date.now(),
+      id: crypto.randomUUID(),
       name: `New ${type}`,
       type,
       x: 0,
@@ -82,30 +105,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateShape: (id, props) => {
     set((state) => {
-      // NaN 방지: 숫자 필드인 경우 체크
-      const sanitizedProps = { ...props };
-      if (sanitizedProps.x !== undefined && isNaN(sanitizedProps.x)) sanitizedProps.x = 0;
-      if (sanitizedProps.y !== undefined && isNaN(sanitizedProps.y)) sanitizedProps.y = 0;
-      if (sanitizedProps.width !== undefined && isNaN(sanitizedProps.width)) sanitizedProps.width = 10;
-      if (sanitizedProps.height !== undefined && isNaN(sanitizedProps.height)) sanitizedProps.height = 10;
-      if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
+      const target = state.shapes.find(s => s.id === id);
+      const sanitized = sanitizeProps(props, target);
 
-      let newShapes = state.shapes.map(s => {
-        if (s.id !== id) return s;
-        const nextShape = { ...s, ...sanitizedProps };
-        
-        // 코너 레디어스 제한 (가로 세로 중 짧은 쪽의 1/2)
-        if (nextShape.type === 'roundedRect') {
-          const maxRadius = Math.min(nextShape.width, nextShape.height) / 2;
-          if ((nextShape.cornerRadius || 0) > maxRadius) {
-            nextShape.cornerRadius = maxRadius;
-          }
-        }
-        return nextShape;
-      });
+      let newShapes = state.shapes.map(s =>
+        s.id !== id ? s : { ...s, ...sanitized }
+      );
 
       // depth가 변경된 경우 재정렬
-      if (sanitizedProps.depth !== undefined) {
+      if (sanitized.depth !== undefined) {
         newShapes.sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0));
       }
 
@@ -115,28 +123,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   updateSelectedShapes: (props) => {
     set((state) => {
-      // NaN 방지
-      const sanitizedProps = { ...props };
-      if (sanitizedProps.x !== undefined && isNaN(sanitizedProps.x)) sanitizedProps.x = 0;
-      if (sanitizedProps.y !== undefined && isNaN(sanitizedProps.y)) sanitizedProps.y = 0;
-      if (sanitizedProps.depth !== undefined && isNaN(sanitizedProps.depth)) sanitizedProps.depth = 0;
-
       let newShapes = state.shapes.map(s => {
         if (!state.selectedShapeIds.has(s.id)) return s;
-        const nextShape = { ...s, ...sanitizedProps };
-        
-        // 코너 레디어스 제한 (가로 세로 중 짧은 쪽의 1/2)
-        if (nextShape.type === 'roundedRect') {
-          const maxRadius = Math.min(nextShape.width, nextShape.height) / 2;
-          if ((nextShape.cornerRadius || 0) > maxRadius) {
-            nextShape.cornerRadius = maxRadius;
-          }
-        }
-        return nextShape;
+        const sanitized = sanitizeProps(props, s);
+        return { ...s, ...sanitized };
       });
 
       // depth가 변경된 경우 재정렬
-      if (sanitizedProps.depth !== undefined) {
+      const sanitizedCheck = sanitizeProps(props);
+      if (sanitizedCheck.depth !== undefined) {
         newShapes.sort((a, b) => (Number(a.depth) || 0) - (Number(b.depth) || 0));
       }
 

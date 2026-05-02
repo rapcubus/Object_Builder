@@ -1,15 +1,14 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { useEditorStore } from '../../stores/editorStore';
-import { Rocket, FolderOpen, Zap, Sparkles } from 'lucide-react';
+import { Rocket, FolderOpen, Sparkles } from 'lucide-react';
 
 const StartModal: React.FC = () => {
   const { isInitialized, setInitialized, setProjectName, projectName } = useEditorStore();
-  const [localName, setLocalName] = useState(projectName);
 
   if (isInitialized) return null;
 
   const handleStart = () => {
-    setProjectName(localName || "Untitled_Object");
+    setProjectName(projectName || "Untitled_Object");
     setInitialized(true);
   };
 
