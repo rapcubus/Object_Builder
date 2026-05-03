@@ -16,6 +16,9 @@ export interface Shape {
   alpha: number;
   rotation: number;
   depth: number;
+  groupId?: string;
+  groupStrokeColor?: string;
+  groupStrokeThickness?: number;
 }
 
 export interface ProjectData {

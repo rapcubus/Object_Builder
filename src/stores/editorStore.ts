@@ -49,6 +49,8 @@ interface EditorState {
   copySelectedShapes: () => void;
 
   selectShape: (id: string | null, isToggle?: boolean) => void;
+  groupSelectedShapes: () => void;
+  ungroupSelectedShapes: () => void;
   reorderShapes: (startIndex: number, endIndex: number) => void;
   setShapes: (shapes: Shape[]) => void;
 
@@ -218,16 +220,61 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!id) {
         if (!isToggle) next.clear();
       } else {
+        const target = state.shapes.find(s => s.id === id);
+        const groupMembers = target?.groupId 
+          ? state.shapes.filter(s => s.groupId === target.groupId).map(s => s.id)
+          : [id];
+
         if (isToggle) {
-          if (next.has(id)) next.delete(id);
-          else next.add(id);
+          const anyInSelection = groupMembers.some(mid => next.has(mid));
+          if (anyInSelection) {
+            groupMembers.forEach(mid => next.delete(mid));
+          } else {
+            groupMembers.forEach(mid => next.add(mid));
+          }
         } else {
           next.clear();
-          next.add(id);
+          groupMembers.forEach(mid => next.add(mid));
         }
       }
       return { selectedShapeIds: next };
     });
+  },
+
+  groupSelectedShapes: () => {
+    const { selectedShapeIds } = get();
+    if (selectedShapeIds.size < 2) return;
+    
+    get().saveHistory();
+    const newGroupId = crypto.randomUUID();
+    
+    set((state) => ({
+      shapes: state.shapes.map(s => 
+        selectedShapeIds.has(s.id) ? { ...s, groupId: newGroupId } : s
+      )
+    }));
+  },
+
+  ungroupSelectedShapes: () => {
+    const { selectedShapeIds, shapes } = get();
+    if (selectedShapeIds.size === 0) return;
+    
+    get().saveHistory();
+    
+    const groupIdsToClear = new Set<string>();
+    shapes.forEach(s => {
+      if (selectedShapeIds.has(s.id) && s.groupId) {
+        groupIdsToClear.add(s.groupId);
+      }
+    });
+
+    if (groupIdsToClear.size === 0) return;
+
+    set((state) => ({
+      shapes: state.shapes.map(s => 
+        (s.groupId && groupIdsToClear.has(s.groupId)) ? { ...s, groupId: undefined } : s
+      )
+    }));
   },
 
   reorderShapes: (startIndex, endIndex) => {

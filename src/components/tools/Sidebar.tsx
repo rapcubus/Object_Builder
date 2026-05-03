@@ -13,7 +13,8 @@ import {
   ChevronUp,
   ChevronDown,
   Trash2,
-  GripVertical
+  GripVertical,
+  Link
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
@@ -126,10 +127,13 @@ const Sidebar: React.FC = () => {
                                   className="w-3 h-3 rounded-full shrink-0 border border-white/10" 
                                   style={{ backgroundColor: shape.color, opacity: shape.alpha }}
                                 />
-                                <div className="flex flex-col min-w-0">
-                                  <span className={`text-[11px] font-bold truncate ${isSelected ? 'text-white' : 'text-gray-300'}`}>
-                                    {shape.name || shape.type.toUpperCase()}
-                                  </span>
+                                  <div className="flex flex-col min-w-0">
+                                    <div className="flex items-center gap-1.5">
+                                      {shape.groupId && <Link size={10} className="text-indigo-400 shrink-0" />}
+                                      <span className={`text-[11px] font-bold truncate ${isSelected ? 'text-white' : 'text-gray-300'}`}>
+                                        {shape.name || shape.type.toUpperCase()}
+                                      </span>
+                                    </div>
                                   <span className="text-[9px] text-gray-600 uppercase font-bold tracking-widest truncate">
                                     {shape.type}
                                   </span>

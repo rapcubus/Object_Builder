@@ -1,6 +1,8 @@
 import Phaser from 'phaser';
 import { useEditorStore } from '../../stores/editorStore';
 import { Shape } from '../../types/game';
+import polygonClipping from 'polygon-clipping';
+import { getShapeWorldPolygon } from '../../utils/geometryUtils';
 
 /**
  * 리팩토링된 오브젝트 빌더 씬
@@ -20,6 +22,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
   private dragStartStates: Map<string, { x: number; y: number }> = new Map();
   private dragStartPointerPos: { x: number; y: number } | null = null;
   private graphicsMap: Map<string, Phaser.GameObjects.Graphics> = new Map();
+  private groupGraphicsMap: Map<string, Phaser.GameObjects.Graphics> = new Map();
   private cursors!: Phaser.Types.Input.Keyboard.CursorKeys;
   private isKeyboardMoving: boolean = false;
   private lastMoveTime: number = 0;
@@ -200,7 +203,7 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     // 마우스 휠 줌
     this.input.on('wheel', (pointer: Phaser.Input.Pointer, _gameObjects: any[], _deltaX: number, deltaY: number, _deltaZ: number) => {
       if (this.isPointerOverUI(pointer)) return;
-      
+
       const cam = this.cameras.main;
       const oldZoom = cam.zoom;
       let newZoom = oldZoom;
@@ -317,9 +320,69 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       }
     });
 
+    const currentGroupIds = new Set<string>();
+    const groupShapesMap = new Map<string, Shape[]>();
+
+    shapes.forEach(s => {
+      if (s.groupId) {
+        currentGroupIds.add(s.groupId);
+        if (!groupShapesMap.has(s.groupId)) groupShapesMap.set(s.groupId, []);
+        groupShapesMap.get(s.groupId)!.push(s);
+      }
+    });
+
+    this.groupGraphicsMap.forEach((g, id) => {
+      if (!currentGroupIds.has(id)) {
+        g.destroy();
+        this.groupGraphicsMap.delete(id);
+      }
+    });
+
     const sortedShapes = [...shapes].sort((a, b) => a.depth - b.depth);
 
-    sortedShapes.forEach((s, index) => {
+    // 그룹 외곽선(다각형 병합) 그리기
+    groupShapesMap.forEach((groupShapes, groupId) => {
+      const hasStroke = groupShapes.some(s => s.groupStrokeThickness && s.groupStrokeThickness > 0);
+      if (!hasStroke) {
+        const g = this.groupGraphicsMap.get(groupId);
+        if (g) g.clear();
+        return;
+      }
+
+      let g = this.groupGraphicsMap.get(groupId);
+      if (!g) {
+        g = this.add.graphics();
+        this.previewContainer.add(g);
+        this.groupGraphicsMap.set(groupId, g);
+      }
+      g.clear();
+
+      try {
+        const polygons = groupShapes.map(s => [getShapeWorldPolygon(s)]);
+        const merged = (polygonClipping.union as any)(...polygons);
+
+        const strokeShape = groupShapes.find(s => s.groupStrokeThickness && s.groupStrokeThickness > 0);
+        const color = parseInt((strokeShape!.groupStrokeColor || '#ffffff').replace('#', ''), 16);
+        const thickness = strokeShape!.groupStrokeThickness || 2;
+        
+        g.lineStyle(thickness, color, 1);
+        
+        merged.forEach(polygon => {
+          polygon.forEach(ring => {
+            const points = ring.map((p: any) => new Phaser.Math.Vector2(p[0], p[1]));
+            g!.strokePoints(points, true);
+          });
+        });
+        
+        // 뎁스를 최소치보다 낮게 설정
+        const minDepth = Math.min(...groupShapes.map(s => s.depth));
+        g.setData('depth', minDepth - 0.5);
+      } catch (e) {
+        console.warn('Polygon clipping failed', e);
+      }
+    });
+
+    sortedShapes.forEach((s) => {
       let g = this.graphicsMap.get(s.id);
 
       if (!g) {
@@ -442,8 +505,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       g.setPosition(s.x, s.y);
       g.setAngle(s.rotation);
 
-      // Depth 설정 (z-index)
-      this.previewContainer.moveTo(g, index);
+      // Depth 설정 (z-index) 및 속성 기록
+      g.setData('depth', s.depth);
 
       // ── 히트 영역 좌표만 갱신 (setInteractive 재호출 없음) ────
       const storedHitArea = g.getData('hitArea') as Phaser.Geom.Rectangle | undefined;
@@ -456,6 +519,9 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         this.drawSelectionHighlight(s);
       }
     });
+
+    // 전체 컨테이너 자식들을 depth 기준으로 정렬
+    this.previewContainer.list.sort((a, b) => (a.getData('depth') || 0) - (b.getData('depth') || 0));
   }
 
 

@@ -1,9 +1,9 @@
 import React from 'react';
 import { useEditorStore } from '../../stores/editorStore';
-import { Trash2, Copy, Sliders, Hash, Move, Maximize, RotateCw, Palette, Layers as LayersIcon } from 'lucide-react';
+import { Trash2, Copy, Sliders, Hash, Move, Maximize, RotateCw, Palette, Layers as LayersIcon, Link, Link2Off } from 'lucide-react';
 
 const Inspector: React.FC = () => {
-    const { shapes, selectedShapeIds, updateSelectedShapes, deleteSelectedShapes, copySelectedShapes, saveHistory, setShapes } = useEditorStore();
+    const { shapes, selectedShapeIds, updateSelectedShapes, deleteSelectedShapes, copySelectedShapes, saveHistory, setShapes, groupSelectedShapes, ungroupSelectedShapes } = useEditorStore();
 
     const selectedShapes = shapes.filter(s => selectedShapeIds.has(s.id));
     const isMultiSelect = selectedShapeIds.size > 1;
@@ -31,7 +31,7 @@ const Inspector: React.FC = () => {
 
     const snapRotation = (val: number) => {
         const snapPoints = [0, 90, 180, 270, 360];
-        const threshold = 5; 
+        const threshold = 5;
         for (const point of snapPoints) {
             if (Math.abs(val - point) < threshold) return point % 360;
         }
@@ -56,7 +56,7 @@ const Inspector: React.FC = () => {
 
     const handleGroupRotationChange = (rawVal: number) => {
         if (!groupRotationRef.current) return;
-        
+
         const newVal = snapRotation(rawVal);
         const { centerX, centerY, initialShapes, initialReferenceRotation } = groupRotationRef.current;
         const deltaDeg = newVal - initialReferenceRotation;
@@ -81,6 +81,21 @@ const Inspector: React.FC = () => {
         });
 
         setShapes(nextShapes);
+    };
+
+    const handleRotationKeyDown = (e: React.KeyboardEvent, currentVal: number, onChange: (val: number) => void) => {
+        if (e.key === 'PageUp') {
+            e.preventDefault();
+            saveHistory();
+            const nextVal = (Math.floor(currentVal / 15) + 1) * 15;
+            onChange(nextVal % 360);
+        } else if (e.key === 'PageDown') {
+            e.preventDefault();
+            saveHistory();
+            const nextVal = (Math.ceil(currentVal / 15) - 1) * 15;
+            const finalVal = nextVal < 0 ? nextVal + 360 : nextVal;
+            onChange(finalVal % 360);
+        }
     };
 
     if (selectedShapeIds.size === 0) {
@@ -176,10 +191,55 @@ const Inspector: React.FC = () => {
                                     value={selectedShapes[0].rotation}
                                     onMouseDown={handleGroupRotationStart}
                                     onChange={(e) => handleGroupRotationChange(Number(e.target.value))}
+                                    onKeyDown={(e) => handleRotationKeyDown(e, selectedShapes[0].rotation, handleGroupRotationChange)}
                                     className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-cyan-500"
                                 />
                             </div>
                         </div>
+
+                        {/* Group Outline Style */}
+                        {selectedShapes.some(s => s.groupId) && (
+                            <div className="space-y-5 pt-4 border-t border-white/5">
+                                <label className="text-xs font-bold text-indigo-400 uppercase tracking-tighter flex items-center gap-2">
+                                    <Link size={12} /> Group Silhouette Outline
+                                </label>
+
+                                {/* Thickness */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest cursor-pointer">Thickness</label>
+                                        <span className="text-xs text-gray-400 font-mono">{selectedShapes[0].groupStrokeThickness || 0}px</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0" max="20" step="1"
+                                        value={selectedShapes[0].groupStrokeThickness || 0}
+                                        onMouseDown={() => saveHistory()}
+                                        onChange={(e) => updateSelectedShapes({ groupStrokeThickness: Number(e.target.value) })}
+                                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    />
+                                </div>
+
+                                {/* Color */}
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="color"
+                                            value={selectedShapes[0].groupStrokeColor || '#ffffff'}
+                                            onMouseDown={() => saveHistory()}
+                                            onChange={(e) => updateSelectedShapes({ groupStrokeColor: e.target.value })}
+                                            className="w-10 h-10 p-0 bg-transparent border-0 cursor-pointer overflow-hidden rounded-md"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={selectedShapes[0].groupStrokeColor || '#ffffff'}
+                                            onChange={(e) => updateSelectedShapes({ groupStrokeColor: e.target.value })}
+                                            className="flex-1 bg-[#1a1a1f] border border-white/10 rounded-lg px-3 py-2 text-[11px] font-mono text-white focus:border-indigo-500 outline-none uppercase"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         <div className="grid grid-cols-1 gap-2 pt-4 border-t border-white/5">
                             <button
@@ -193,6 +253,23 @@ const Inspector: React.FC = () => {
                                 className="flex items-center justify-center gap-3 p-3 rounded-lg bg-red-500/10 border border-red-500/30 text-red-400 hover:bg-red-500/20 transition-all text-xs font-bold"
                             >
                                 <Trash2 size={14} /> Delete Group
+                            </button>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-2 mt-2">
+                            <button
+                                onClick={groupSelectedShapes}
+                                disabled={selectedShapes.length < 2}
+                                className="flex items-center justify-center gap-2 p-2 rounded-lg bg-indigo-500/10 border border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/20 transition-all text-[11px] font-bold disabled:opacity-30"
+                            >
+                                <Link size={14} /> Group
+                            </button>
+                            <button
+                                onClick={ungroupSelectedShapes}
+                                disabled={!selectedShapes.some(s => s.groupId)}
+                                className="flex items-center justify-center gap-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-all text-[11px] font-bold disabled:opacity-30"
+                            >
+                                <Link2Off size={14} /> Ungroup
                             </button>
                         </div>
                     </div>
@@ -444,10 +521,53 @@ const Inspector: React.FC = () => {
                                         const snapped = snapRotation(Number(e.target.value));
                                         updateSelectedShapes({ rotation: snapped });
                                     }}
+                                    onKeyDown={(e) => handleRotationKeyDown(e, target.rotation, (val) => updateSelectedShapes({ rotation: val }))}
                                     className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-cyan-500"
                                 />
                             </div>
                         </div>
+
+                        {/* Group Outline Style (Single Select Group Edge Case) */}
+                        {target.groupId && (
+                            <div className="space-y-5 pt-4 border-t border-white/5">
+                                <label className="text-xs font-bold text-indigo-400 uppercase tracking-tighter flex items-center gap-2">
+                                    <Link size={12} /> Group Silhouette Outline
+                                </label>
+
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest cursor-pointer">Thickness</label>
+                                        <span className="text-xs text-gray-400 font-mono">{target.groupStrokeThickness || 0}px</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="0" max="20" step="1"
+                                        value={target.groupStrokeThickness || 0}
+                                        onMouseDown={() => saveHistory()}
+                                        onChange={(e) => updateSelectedShapes({ groupStrokeThickness: Number(e.target.value) })}
+                                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-indigo-500"
+                                    />
+                                </div>
+
+                                <div className="space-y-2">
+                                    <div className="flex gap-2">
+                                        <input
+                                            type="color"
+                                            value={target.groupStrokeColor || '#ffffff'}
+                                            onMouseDown={() => saveHistory()}
+                                            onChange={(e) => updateSelectedShapes({ groupStrokeColor: e.target.value })}
+                                            className="w-10 h-10 p-0 bg-transparent border-0 cursor-pointer overflow-hidden rounded-md"
+                                        />
+                                        <input
+                                            type="text"
+                                            value={target.groupStrokeColor || '#ffffff'}
+                                            onChange={(e) => updateSelectedShapes({ groupStrokeColor: e.target.value })}
+                                            className="flex-1 bg-[#1a1a1f] border border-white/10 rounded-lg px-3 py-2 text-[11px] font-mono text-white focus:border-indigo-500 outline-none uppercase"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        )}
 
                         {/* Depth & Order */}
                         <div className="space-y-4 pt-4 border-t border-white/5">
@@ -477,6 +597,16 @@ const Inspector: React.FC = () => {
                         </div>
 
                         {/* Actions */}
+                        {target.groupId && (
+                            <div className="pt-4 border-t border-white/5">
+                                <button
+                                    onClick={ungroupSelectedShapes}
+                                    className="w-full flex items-center justify-center gap-2 p-2 rounded-lg bg-orange-500/10 border border-orange-500/30 text-orange-400 hover:bg-orange-500/20 transition-all text-[11px] font-bold"
+                                >
+                                    <Link2Off size={12} /> Ungroup This Group
+                                </button>
+                            </div>
+                        )}
                         <div className="grid grid-cols-2 gap-2 pt-4">
                             <button
                                 onClick={copySelectedShapes}
