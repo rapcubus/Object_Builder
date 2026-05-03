@@ -367,8 +367,8 @@ export default class ObjectBuilderScene extends Phaser.Scene {
         
         g.lineStyle(thickness, color, 1);
         
-        merged.forEach(polygon => {
-          polygon.forEach(ring => {
+        merged.forEach((polygon: any) => {
+          polygon.forEach((ring: any) => {
             const points = ring.map((p: any) => new Phaser.Math.Vector2(p[0], p[1]));
             g!.strokePoints(points, true);
           });
