@@ -234,6 +234,17 @@ export default class ObjectBuilderScene extends Phaser.Scene {
     if (s.type === 'circle') {
       return null; // circle은 별도 처리
     }
+    if (s.type === 'arc') {
+      const r = (s.radius || 25) + offset;
+      const arcAng = s.arcAngle ?? 270;
+      const segments = Math.max(8, Math.floor(32 * (arcAng / 360)));
+      const points = [{ x: 0, y: 0 }]; // 중심점
+      for (let i = 0; i <= segments; i++) {
+        const rad = ((i / segments) * arcAng * Math.PI) / 180;
+        points.push({ x: Math.cos(rad) * r, y: Math.sin(rad) * r });
+      }
+      return points;
+    }
     if (s.type === 'triangle') {
       return [{ x: 0, y: -hh }, { x: -hw, y: hh }, { x: hw, y: hh }];
     }
@@ -492,6 +503,16 @@ export default class ObjectBuilderScene extends Phaser.Scene {
       } else if (s.type === 'circle') {
         hw = hh = s.radius || 25;
         g.fillCircle(0, 0, hw);
+      } else if (s.type === 'arc') {
+        hw = hh = s.radius || 25;
+        const arcAng = s.arcAngle ?? 270;
+        // Phaser Graphics slice(x, y, radius, startAngle, endAngle, anticlockwise)
+        // startAngle, endAngle are in radians.
+        g.beginPath();
+        g.moveTo(0, 0);
+        g.arc(0, 0, hw, 0, (arcAng * Math.PI) / 180, false, 0);
+        g.closePath();
+        g.fillPath();
       } else {
         const points = this.getShapePoints(s);
         if (points) g.fillPoints(points, true);

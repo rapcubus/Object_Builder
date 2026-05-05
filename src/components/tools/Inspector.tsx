@@ -98,6 +98,63 @@ const Inspector: React.FC = () => {
         }
     };
 
+    // Group scale reference state
+    const groupScaleRef = React.useRef<{
+        centerX: number;
+        centerY: number;
+        initialShapes: { id: string; x: number; y: number; width: number; height: number; radius?: number; cornerRadius?: number }[];
+    } | null>(null);
+    const [groupScaleValue, setGroupScaleValue] = React.useState(100);
+
+    const handleGroupScaleStart = () => {
+        saveHistory();
+        if (selectedShapes.length === 0) return;
+
+        const centerX = selectedShapes.reduce((sum, s) => sum + s.x, 0) / selectedShapes.length;
+        const centerY = selectedShapes.reduce((sum, s) => sum + s.y, 0) / selectedShapes.length;
+
+        groupScaleRef.current = {
+            centerX,
+            centerY,
+            initialShapes: selectedShapes.map(s => ({ 
+                id: s.id, x: s.x, y: s.y, 
+                width: s.width, height: s.height, 
+                radius: s.radius, cornerRadius: s.cornerRadius 
+            }))
+        };
+        setGroupScaleValue(100);
+    };
+
+    const handleGroupScaleChange = (scalePct: number) => {
+        setGroupScaleValue(scalePct);
+        if (!groupScaleRef.current) return;
+        const ratio = scalePct / 100;
+        const { centerX, centerY, initialShapes } = groupScaleRef.current;
+
+        const nextShapes = shapes.map(s => {
+            const initial = initialShapes.find(is => is.id === s.id);
+            if (initial) {
+                const dx = initial.x - centerX;
+                const dy = initial.y - centerY;
+                return {
+                    ...s,
+                    x: Math.round(centerX + dx * ratio),
+                    y: Math.round(centerY + dy * ratio),
+                    width: Math.round(initial.width * ratio),
+                    height: Math.round(initial.height * ratio),
+                    ...(initial.radius !== undefined && { radius: Math.round(initial.radius * ratio) }),
+                    ...(initial.cornerRadius !== undefined && { cornerRadius: Math.round(initial.cornerRadius * ratio) })
+                };
+            }
+            return s;
+        });
+        setShapes(nextShapes);
+    };
+
+    const handleGroupScaleEnd = () => {
+        groupScaleRef.current = null;
+        setGroupScaleValue(100);
+    };
     if (selectedShapeIds.size === 0) {
         return (
             <div className="w-80 bg-[#0f0f14] border-l border-white/10 flex flex-col h-full shadow-2xl z-10">
@@ -193,6 +250,26 @@ const Inspector: React.FC = () => {
                                     onChange={(e) => handleGroupRotationChange(Number(e.target.value))}
                                     onKeyDown={(e) => handleRotationKeyDown(e, selectedShapes[0].rotation, handleGroupRotationChange)}
                                     className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                                />
+                            </div>
+
+                            {/* Scale */}
+                            <div className="space-y-2">
+                                <div className="flex justify-between items-center">
+                                    <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
+                                        <Maximize size={12} /> Group Scale
+                                    </label>
+                                    <span className="text-xs text-gray-400 font-mono">{groupScaleValue}%</span>
+                                </div>
+                                <input
+                                    type="range"
+                                    min="10" max="300" step="1"
+                                    value={groupScaleValue}
+                                    onMouseDown={handleGroupScaleStart}
+                                    onChange={(e) => handleGroupScaleChange(Number(e.target.value))}
+                                    onMouseUp={handleGroupScaleEnd}
+                                    onMouseLeave={handleGroupScaleEnd}
+                                    className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
                                 />
                             </div>
                         </div>
@@ -393,8 +470,28 @@ const Inspector: React.FC = () => {
                         </div>
 
                         {/* Shape Specific Props */}
-                        {(target.type === 'roundedRect' || target.type === 'trapezoid') && (
+                        {(target.type === 'roundedRect' || target.type === 'trapezoid' || target.type === 'arc') && (
                             <div className="space-y-4 pt-2 pb-2">
+                                {target.type === 'arc' && (
+                                    <div className="space-y-2">
+                                        <div className="flex justify-between items-center">
+                                            <label htmlFor="arc-angle" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
+                                                <Sliders size={10} /> Arc Angle
+                                            </label>
+                                            <span className="text-xs text-gray-400 font-mono">{target.arcAngle || 270}°</span>
+                                        </div>
+                                        <input
+                                            id="arc-angle"
+                                            name="arc-angle"
+                                            type="range"
+                                            min="1" max="360" step="1"
+                                            value={target.arcAngle || 270}
+                                            onMouseDown={() => saveHistory()}
+                                            onChange={(e) => updateSelectedShapes({ arcAngle: Number(e.target.value) })}
+                                            className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                                        />
+                                    </div>
+                                )}
                                 {target.type === 'roundedRect' && (
                                     <div className="space-y-2">
                                         <div className="flex justify-between items-center">

@@ -61,6 +61,16 @@ export function getShapeWorldPolygon(s: Shape, circleSegments: number = 32): Pol
             const rad = (i * 2 * Math.PI) / circleSegments;
             points.push([Math.cos(rad) * r, Math.sin(rad) * r]);
         }
+    } else if (s.type === 'arc') {
+        const r = s.radius || 25;
+        const arcAng = s.arcAngle ?? 270;
+        points.push([0, 0]); // 중심점
+        const segments = Math.max(8, Math.floor(circleSegments * (arcAng / 360)));
+        for (let i = 0; i <= segments; i++) {
+            const rad = ((i / segments) * arcAng * Math.PI) / 180;
+            // Phaser의 기본 그리기(0도가 오른쪽, 시계방향)에 맞춰 각도 연산
+            points.push([Math.cos(rad) * r, Math.sin(rad) * r]);
+        }
     } else if (s.type === 'triangle') {
         points = [
             [0, -hh],

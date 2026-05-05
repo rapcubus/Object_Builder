@@ -26,6 +26,11 @@ function sanitizeProps(props: Partial<Shape>, currentShape?: Shape): Partial<Sha
     if (s.rotation < 0) s.rotation += 360;
   }
 
+  if (s.arcAngle !== undefined) {
+    if (s.arcAngle < 1) s.arcAngle = 1;
+    if (s.arcAngle > 360) s.arcAngle = 360;
+  }
+
   return s;
 }
 
@@ -110,6 +115,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       cornerRadius: 5,
       angleLeft: 60,
       angleRight: 60,
+      arcAngle: 270,
       color: '#ffa500',
       alpha: 1,
       rotation: 0,

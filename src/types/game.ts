@@ -1,4 +1,4 @@
-export type ShapeType = 'rect' | 'roundedRect' | 'circle' | 'triangle' | 'rightTriangle' | 'mirroredRightTriangle' | 'trapezoid' | 'pentagon' | 'hexagon';
+export type ShapeType = 'rect' | 'roundedRect' | 'circle' | 'arc' | 'triangle' | 'rightTriangle' | 'mirroredRightTriangle' | 'trapezoid' | 'pentagon' | 'hexagon';
 
 export interface Shape {
   id: string;
@@ -12,6 +12,7 @@ export interface Shape {
   cornerRadius?: number;
   angleLeft?: number;
   angleRight?: number;
+  arcAngle?: number;
   color: string;
   alpha: number;
   rotation: number;

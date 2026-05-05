@@ -14,7 +14,8 @@ import {
   ChevronDown,
   Trash2,
   GripVertical,
-  Link
+  Link,
+  PieChart
 } from 'lucide-react';
 import { DragDropContext, Droppable, Draggable, DropResult } from '@hello-pangea/dnd';
 
@@ -48,6 +49,7 @@ const Sidebar: React.FC = () => {
     { type: 'trapezoid', label: 'Trapez', icon: <Box size={16} className="skew-x-12" /> },
     { type: 'pentagon', label: 'Pent', icon: <Pentagon size={16} /> },
     { type: 'hexagon', label: 'Hex', icon: <Hexagon size={16} /> },
+    { type: 'arc', label: 'Arc/Pie', icon: <PieChart size={16} /> },
   ];
 
   return (
