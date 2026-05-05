@@ -59,6 +59,8 @@ interface EditorState {
 
   // History stack (simplified for now)
   undoStack: string[];
+
+  clearProject: () => void;
 }
 
 export const useEditorStore = create<EditorState>((set, get) => ({
@@ -72,6 +74,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   setProjectName: (name) => set({ projectName: name }),
   setFileHandle: (handle) => set({ fileHandle: handle }),
   setInitialized: (val) => set({ isInitialized: val }),
+
+  clearProject: () => {
+    set({
+      shapes: [],
+      selectedShapeIds: new Set(),
+      projectName: "Untitled_Object",
+      fileHandle: null,
+      undoStack: []
+    });
+  },
 
   setShapes: (shapes) => {
     // 전역적인 데이터 타입 검증 (NaN 및 문자열 혼입 방지)

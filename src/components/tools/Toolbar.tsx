@@ -5,11 +5,13 @@ import {
   FolderOpen, 
   Undo2, 
   Settings,
-  Edit3
+  Edit3,
+  FilePlus,
+  SaveAll
 } from 'lucide-react';
 
 const Toolbar: React.FC = () => {
-  const { projectName, setProjectName, undo, undoStack, shapes, fileHandle, setFileHandle } = useEditorStore();
+  const { projectName, setProjectName, undo, undoStack, shapes, fileHandle, setFileHandle, clearProject } = useEditorStore();
 
   const handleOpen = async () => {
     try {
@@ -54,6 +56,51 @@ const Toolbar: React.FC = () => {
     } catch (err) {
       if ((err as Error).name !== 'AbortError') {
         console.error("Open failed", err);
+      }
+    }
+  };
+
+  const handleNewProject = () => {
+    if (shapes.length > 0) {
+      if (!window.confirm('현재 작업 중인 내용이 모두 초기화됩니다. 계속하시겠습니까?')) {
+        return;
+      }
+    }
+    clearProject();
+  };
+
+  const handleSaveAs = async () => {
+    const fileName = projectName.toLowerCase().endsWith('.json') 
+      ? projectName 
+      : `${projectName}.json`;
+
+    const data = JSON.stringify({ projectName, shapes }, null, 2);
+
+    try {
+      if ('showSaveFilePicker' in window) {
+        const handle = await (window as any).showSaveFilePicker({
+          suggestedName: fileName,
+          types: [{ description: 'JSON Files', accept: { 'application/json': ['.json'] } }]
+        });
+        const writable = await handle.createWritable();
+        await writable.write(data);
+        await writable.close();
+        setFileHandle(handle);
+        alert('새로운 이름으로 저장되었습니다.');
+      } else {
+        // Fallback: Download
+        const blob = new Blob([data], { type: 'application/json' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = fileName;
+        a.click();
+        URL.revokeObjectURL(url);
+      }
+    } catch (err) {
+      if ((err as Error).name !== 'AbortError') {
+        console.error("Save As failed", err);
+        alert("저장에 실패했습니다.");
       }
     }
   };
@@ -143,6 +190,12 @@ const Toolbar: React.FC = () => {
 
         <div className="flex items-center gap-2">
             <button 
+                onClick={handleNewProject}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium"
+            >
+                <FilePlus size={16} /> New
+            </button>
+            <button 
                 onClick={handleOpen}
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium"
             >
@@ -153,6 +206,12 @@ const Toolbar: React.FC = () => {
                 className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium"
             >
                 <Save size={16} /> Save
+            </button>
+            <button 
+                onClick={handleSaveAs}
+                className="flex items-center gap-2 px-4 py-2 rounded-lg bg-[#1a1a1f] border border-white/5 text-gray-400 hover:bg-white/5 hover:text-white transition-all text-xs font-medium"
+            >
+                <SaveAll size={16} /> Save As
             </button>
         </div>
       </div>
