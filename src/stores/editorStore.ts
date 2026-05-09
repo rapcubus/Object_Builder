@@ -21,6 +21,19 @@ function sanitizeProps(props: Partial<Shape>, currentShape?: Shape): Partial<Sha
     if (merged.cornerRadius > maxRadius) s.cornerRadius = maxRadius;
   }
 
+  // circle/arc일 때 radius와 width/height 동기화
+  if (merged.type === 'circle' || merged.type === 'arc') {
+    if (s.radius !== undefined) {
+      s.width = s.radius * 2;
+      s.height = s.radius * 2;
+    } else if (s.width !== undefined || s.height !== undefined) {
+      // width나 height가 변경되면 radius를 그 평균으로 업데이트 (비균등 스케일 지원용)
+      const w = s.width ?? merged.width ?? 50;
+      const h = s.height ?? merged.height ?? 50;
+      s.radius = (w + h) / 4;
+    }
+  }
+
   if (s.rotation !== undefined) {
     s.rotation = Math.round(s.rotation % 360);
     if (s.rotation < 0) s.rotation += 360;

@@ -1,6 +1,6 @@
 import React from 'react';
 import { useEditorStore } from '../../stores/editorStore';
-import { Trash2, Copy, Sliders, Hash, Move, Maximize, RotateCw, Palette, Layers as LayersIcon, Link, Link2Off } from 'lucide-react';
+import { Trash2, Copy, Sliders, Hash, Move, Maximize, RotateCw, Palette, Layers as LayersIcon, Link, Link2Off, Lock, Unlock } from 'lucide-react';
 
 const Inspector: React.FC = () => {
     const { shapes, selectedShapeIds, updateSelectedShapes, deleteSelectedShapes, copySelectedShapes, saveHistory, setShapes, groupSelectedShapes, ungroupSelectedShapes } = useEditorStore();
@@ -104,7 +104,9 @@ const Inspector: React.FC = () => {
         centerY: number;
         initialShapes: { id: string; x: number; y: number; width: number; height: number; radius?: number; cornerRadius?: number }[];
     } | null>(null);
-    const [groupScaleValue, setGroupScaleValue] = React.useState(100);
+    const [groupScaleX, setGroupScaleX] = React.useState(100);
+    const [groupScaleY, setGroupScaleY] = React.useState(100);
+    const [isUniformScale, setIsUniformScale] = React.useState(true);
 
     const handleGroupScaleStart = () => {
         saveHistory();
@@ -122,13 +124,29 @@ const Inspector: React.FC = () => {
                 radius: s.radius, cornerRadius: s.cornerRadius 
             }))
         };
-        setGroupScaleValue(100);
+        setGroupScaleX(100);
+        setGroupScaleY(100);
     };
 
-    const handleGroupScaleChange = (scalePct: number) => {
-        setGroupScaleValue(scalePct);
+    const handleGroupScaleChange = (val: number, axis: 'x' | 'y') => {
         if (!groupScaleRef.current) return;
-        const ratio = scalePct / 100;
+        
+        let nextX = groupScaleX;
+        let nextY = groupScaleY;
+
+        if (axis === 'x') {
+            nextX = val;
+            if (isUniformScale) nextY = val;
+        } else {
+            nextY = val;
+            if (isUniformScale) nextX = val;
+        }
+
+        setGroupScaleX(nextX);
+        setGroupScaleY(nextY);
+
+        const ratioX = nextX / 100;
+        const ratioY = nextY / 100;
         const { centerX, centerY, initialShapes } = groupScaleRef.current;
 
         const nextShapes = shapes.map(s => {
@@ -138,12 +156,12 @@ const Inspector: React.FC = () => {
                 const dy = initial.y - centerY;
                 return {
                     ...s,
-                    x: Math.round(centerX + dx * ratio),
-                    y: Math.round(centerY + dy * ratio),
-                    width: Math.round(initial.width * ratio),
-                    height: Math.round(initial.height * ratio),
-                    ...(initial.radius !== undefined && { radius: Math.round(initial.radius * ratio) }),
-                    ...(initial.cornerRadius !== undefined && { cornerRadius: Math.round(initial.cornerRadius * ratio) })
+                    x: Math.round(centerX + dx * ratioX),
+                    y: Math.round(centerY + dy * ratioY),
+                    width: Math.round(initial.width * ratioX),
+                    height: Math.round(initial.height * ratioY),
+                    ...(initial.radius !== undefined && { radius: Math.round(initial.radius * ((ratioX + ratioY) / 2)) }),
+                    ...(initial.cornerRadius !== undefined && { cornerRadius: Math.round(initial.cornerRadius * Math.min(ratioX, ratioY)) })
                 };
             }
             return s;
@@ -153,7 +171,8 @@ const Inspector: React.FC = () => {
 
     const handleGroupScaleEnd = () => {
         groupScaleRef.current = null;
-        setGroupScaleValue(100);
+        setGroupScaleX(100);
+        setGroupScaleY(100);
     };
     if (selectedShapeIds.size === 0) {
         return (
@@ -254,23 +273,55 @@ const Inspector: React.FC = () => {
                             </div>
 
                             {/* Scale */}
-                            <div className="space-y-2">
+                            <div className="space-y-4">
                                 <div className="flex justify-between items-center">
                                     <label className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
                                         <Maximize size={12} /> Group Scale
                                     </label>
-                                    <span className="text-xs text-gray-400 font-mono">{groupScaleValue}%</span>
+                                    <button 
+                                        onClick={() => setIsUniformScale(!isUniformScale)}
+                                        className={`p-1.5 rounded-md transition-all ${isUniformScale ? 'bg-green-500/20 text-green-400' : 'bg-white/5 text-gray-500'}`}
+                                        title={isUniformScale ? "비율 유지 활성화" : "개별 스케일 활성화"}
+                                    >
+                                        {isUniformScale ? <Lock size={12} /> : <Unlock size={12} />}
+                                    </button>
                                 </div>
-                                <input
-                                    type="range"
-                                    min="10" max="300" step="1"
-                                    value={groupScaleValue}
-                                    onMouseDown={handleGroupScaleStart}
-                                    onChange={(e) => handleGroupScaleChange(Number(e.target.value))}
-                                    onMouseUp={handleGroupScaleEnd}
-                                    onMouseLeave={handleGroupScaleEnd}
-                                    className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
-                                />
+                                
+                                {/* X Scale */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[9px] font-bold text-gray-600 uppercase">Width (X)</span>
+                                        <span className="text-xs text-gray-400 font-mono">{groupScaleX}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="10" max="300" step="1"
+                                        value={groupScaleX}
+                                        onMouseDown={handleGroupScaleStart}
+                                        onChange={(e) => handleGroupScaleChange(Number(e.target.value), 'x')}
+                                        onMouseUp={handleGroupScaleEnd}
+                                        onMouseLeave={handleGroupScaleEnd}
+                                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                                    />
+                                </div>
+
+                                {/* Y Scale */}
+                                <div className="space-y-2">
+                                    <div className="flex justify-between items-center">
+                                        <span className="text-[9px] font-bold text-gray-600 uppercase">Height (Y)</span>
+                                        <span className="text-xs text-gray-400 font-mono">{groupScaleY}%</span>
+                                    </div>
+                                    <input
+                                        type="range"
+                                        min="10" max="300" step="1"
+                                        value={groupScaleY}
+                                        onMouseDown={handleGroupScaleStart}
+                                        onChange={(e) => handleGroupScaleChange(Number(e.target.value), 'y')}
+                                        onMouseUp={handleGroupScaleEnd}
+                                        onMouseLeave={handleGroupScaleEnd}
+                                        className="w-full h-1.5 bg-[#1a1a1f] rounded-lg appearance-none cursor-pointer accent-green-500"
+                                    />
+                                </div>
                             </div>
                         </div>
 
