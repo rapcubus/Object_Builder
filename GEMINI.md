@@ -13,23 +13,21 @@
 
 ---
 
-## 연동 레포 정보
+## 레포지토리 정보
 
 | 항목 | 내용 |
 |---|---|
-| 게임 레포 | `github.com/{username}/{game-repo}` |
-| 툴 레포 | `github.com/{username}/{game-repo}-tools` |
-| 공유 타입 | 게임 레포 `src/types/game.d.ts` 기준으로 툴 레포 `src/types/` 동기화 |
-| 데이터 포맷 변경 시 | 양쪽 레포 동시 업데이트 필수 |
-
-> ⚠️ `{username}`과 레포명은 실제 GitHub 계정에 맞게 수정하세요.
+| 레포지토리 | `github.com/rapcubus/Object_Builder` |
+| 프로젝트명 | `Metal Blossom - Object Builder` |
+| 공유 타입 | `src/types/game.ts` 정의 활용 |
+| 데이터 내보내기 | `src/data/` 경로로 JSON export 및 수동 연동 |
 
 ---
 
 ## 프로젝트 구조
 
 ```
-game-tools/
+Object_Builder/
 ├── AGENTS.md
 ├── GEMINI.md
 ├── index.html
@@ -43,7 +41,7 @@ game-tools/
 │   ├── main.tsx               # React 앱 진입점
 │   ├── App.tsx                # HashRouter + 툴 라우팅
 │   ├── types/
-│   │   └── game.d.ts          # 게임 레포와 공유하는 데이터 타입
+│   │   └── game.ts            # 데이터 타입 정의
 │   ├── components/
 │   │   ├── common/            # 공통 UI 컴포넌트 (Button, Modal 등)
 │   │   └── tools/             # 툴별 전용 컴포넌트
@@ -53,14 +51,9 @@ game-tools/
 │   ├── stores/
 │   │   └── editorStore.ts     # Zustand 전역 상태
 │   ├── tools/
-│   │   ├── MapEditor/         # 맵 에디터 툴
-│   │   │   ├── index.tsx
-│   │   │   ├── TilePalette.tsx
-│   │   │   ├── Canvas.tsx
-│   │   │   └── Toolbar.tsx
-│   │   └── BalanceEditor/     # 밸런스(스탯) 에디터 툴
-│   │       ├── index.tsx
-│   │       └── StatTable.tsx
+│   │   └── ObjectBuilder/     # 오브젝트 빌더 툴 (현재 주력)
+│   │       ├── ObjectBuilderScene.ts
+│   │       └── ...
 │   └── utils/
 │       ├── exportJson.ts      # Blob 기반 JSON 다운로드
 │       └── importJson.ts      # 파일 import 파싱
@@ -73,9 +66,7 @@ game-tools/
 
 | 경로 | 툴 이름 | 설명 |
 |---|---|---|
-| `/#/` | 홈 | 툴 목록 대시보드 |
-| `/#/map-editor` | 맵 에디터 | 타일맵 배치 및 JSON export |
-| `/#/balance-editor` | 밸런스 에디터 | 적/타워 스탯 수정 및 export |
+| `/#/` | 오브젝트 빌더 | Phaser.js 기반 도형 조합 및 JSON export |
 
 > 새 툴 추가 시 이 목록과 `App.tsx` 라우팅을 동시에 업데이트한다.
 
@@ -124,7 +115,7 @@ jobs:
           publish_dir: ./dist
 ```
 
-> `vite.config.ts`에 `base: '/{레포명}/'` 설정 필수
+> `vite.config.ts`에 `base: './'` 설정 (GitHub Pages 호환용)
 
 ---
 
@@ -141,6 +132,6 @@ jobs:
 
 ## Antigravity 에이전트 운용 지침
 
-- 툴 하나를 완성할 때마다 export JSON을 게임 레포에서 실제로 불러와 호환 여부를 검증한다
-- 새 툴 추가 시 반드시 이 파일의 **툴 목록 및 라우팅** 섹션을 먼저 업데이트하고 승인받은 뒤 개발 시작
-- `src/types/game.d.ts` 수정은 게임 레포 영향도를 함께 보고한다
+- 툴의 export JSON을 실제 프로젝트에서 불러와 호환 여부를 검증한다
+- 새로운 기능 추가 시 `worklog.md`에 기록하며 진행한다
+- `src/types/game.ts` 수정 시 데이터 스키마 영향도를 반드시 확인한다
