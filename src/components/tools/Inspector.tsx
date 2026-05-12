@@ -325,6 +325,24 @@ const Inspector: React.FC = () => {
                             </div>
                         </div>
 
+                        {/* Layering (Multi-select) */}
+                        <div className="space-y-4 pt-4 border-t border-white/5">
+                            <div className="space-y-2">
+                                <label htmlFor="multi-depth" className="text-[10px] font-bold text-gray-700 uppercase tracking-widest flex items-center gap-2 cursor-pointer">
+                                    <Sliders size={10} /> Rendering Depth
+                                </label>
+                                <input
+                                    id="multi-depth"
+                                    name="multi-depth"
+                                    type="number"
+                                    value={selectedShapes[0].depth}
+                                    onChange={(e) => updateSelectedShapes({ depth: Number(e.target.value) })}
+                                    className="w-full bg-[#1a1a1f] border border-white/10 rounded-lg px-3 py-2 text-xs font-mono text-orange-400 focus:border-orange-500/50 outline-none"
+                                />
+                                <p className="text-[9px] text-gray-600 italic">Sets depth for all {selectedShapeIds.size} selected items.</p>
+                            </div>
+                        </div>
+
                         {/* Group Outline Style */}
                         {selectedShapes.some(s => s.groupId) && (
                             <div className="space-y-5 pt-4 border-t border-white/5">
